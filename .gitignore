@@ -1,0 +1,28 @@
+# Gradle and Android build output
+.gradle/
+**/build/
+
+# Machine-local Android SDK configuration
+local.properties
+
+# Runtime secrets and signing material
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+
+# IDE and operating-system files
+.idea/
+*.iml
+.DS_Store
+
+# Local QA artifacts
+captures/
+screenshots/
+*.log
+
+# Python and Supabase CLI local state
+__pycache__/
+*.py[cod]
+supabase/.temp/

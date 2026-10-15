@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.Daymark" parent="Theme.Daymark.Base">
+        <item name="android:windowLightNavigationBar">@bool/light_system_bars</item>
+    </style>
+</resources>
