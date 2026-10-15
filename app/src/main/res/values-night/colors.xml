@@ -1,0 +1,5 @@
+<resources>
+    <color name="splash_background_color">#14131C</color>
+    <bool name="light_system_bars">false</bool>
+    <item type="drawable" name="themed_splash_logo">@drawable/raheel_optics_logo</item>
+</resources>

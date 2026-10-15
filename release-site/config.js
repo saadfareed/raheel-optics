@@ -1,0 +1,2 @@
+// Public configuration only; generated from an explicit allowlist.
+window.DAYMARK = {"supabaseUrl": "https://dydzyogdseinckfwhbyy.supabase.co", "publicKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5ZHp5b2dkc2VpbmNrZndoYnl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEzMTUxNDIsImV4cCI6MjEwNjg5MTE0Mn0.dxhZVSWHiFdJXtzgtzaFkZOT16rOTsXnfDh96_gv2h4", "supportEmail": "pakistanbakeries@gmail.com", "developerName": "Saad Fareed"};

@@ -1,0 +1,206 @@
+[
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_expand_less.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_expand_less.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_notifications_off.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_notifications_off.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_check_circle.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_check_circle.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_filter_alt_off.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_filter_alt_off.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_verified_user.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_verified_user.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_download.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_download.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_splash_background.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/splash_background.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_add.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_add.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_check.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_check.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_notification.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_notification.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_lock.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_lock.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_expand_more.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_expand_more.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/mipmap-anydpi_ic_launcher.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/mipmap-anydpi/ic_launcher.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable-nodpi_raheel_optics_logo.png.flat",
+        "source": "com.daymark.todo.app-branding-51:/drawable-nodpi/raheel_optics_logo.png"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable-nodpi_daymark_splash_mark.png.flat",
+        "source": "com.daymark.todo.app-branding-51:/drawable-nodpi/daymark_splash_mark.png"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_person.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_person.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_settings.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_settings.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_upload.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_upload.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_donut_large.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_donut_large.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_storage.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_storage.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_notifications_none.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_notifications_none.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_palette.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_palette.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_grid_view.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_grid_view.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_edit.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_edit.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_notifications.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_notifications.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_history.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_history.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_replay.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_replay.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_launcher_monochrome.xml.flat",
+        "source": "com.daymark.todo.app-branding-51:/drawable/ic_launcher_monochrome.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_cloud_done.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_cloud_done.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_delete_outline.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_delete_outline.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_notifications_active.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_notifications_active.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_cloud_off.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_cloud_off.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_alarm.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_alarm.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_visibility_off.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_visibility_off.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_privacy_tip.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_privacy_tip.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_chevron_right.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_chevron_right.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_logout.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_logout.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/xml_data_extraction_rules.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/xml/data_extraction_rules.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_close.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_close.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_notes.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_notes.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_radio_button_unchecked.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_radio_button_unchecked.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_splash_mark.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/splash_mark.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_tune.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_tune.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_info.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_info.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_search.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_search.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable-nodpi_daymark_logo_transparent.png.flat",
+        "source": "com.daymark.todo.app-branding-51:/drawable-nodpi/daymark_logo_transparent.png"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_event.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_event.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_visibility.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_visibility.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.daymark.todo.app-branding-51:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_timer.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_timer.xml"
+    },
+    {
+        "merged": "com.daymark.todo.app-debug-48:/drawable_ic_ui_schedule.xml.flat",
+        "source": "com.daymark.todo.app-main-50:/drawable/ic_ui_schedule.xml"
+    }
+]

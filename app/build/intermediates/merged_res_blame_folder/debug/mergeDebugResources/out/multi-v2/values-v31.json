@@ -1,0 +1,28 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.daymark.todo.app-mergeDebugResources-46:/values-v31/values-v31.xml",
+            "map": [
+                {
+                    "source": "/home/saad/Code/raheel-optics/app/src/main/res/values-v31/styles.xml",
+                    "from": {
+                        "startLines": "1",
+                        "startColumns": "4",
+                        "startOffsets": "16",
+                        "endLines": "7",
+                        "endColumns": "12",
+                        "endOffsets": "540"
+                    },
+                    "to": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endLines": "8",
+                        "endColumns": "12",
+                        "endOffsets": "579"
+                    }
+                }
+            ]
+        }
+    ]
+}

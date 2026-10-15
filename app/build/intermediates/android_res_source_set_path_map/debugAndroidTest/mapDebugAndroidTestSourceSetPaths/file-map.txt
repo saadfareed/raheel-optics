@@ -1,0 +1,6 @@
+com.daymark.todo.test.app-androidTest-0 /home/saad/Code/raheel-optics/app/build/generated/res/resValues/androidTest/debug
+com.daymark.todo.test.app-updated_navigation_xml-1 /home/saad/Code/raheel-optics/app/build/generated/updated_navigation_xml/debugAndroidTest
+com.daymark.todo.test.app-packageDebugAndroidTestResources-2 /home/saad/Code/raheel-optics/app/build/intermediates/incremental/debugAndroidTest/packageDebugAndroidTestResources/merged.dir
+com.daymark.todo.test.app-packageDebugAndroidTestResources-3 /home/saad/Code/raheel-optics/app/build/intermediates/incremental/debugAndroidTest/packageDebugAndroidTestResources/stripped.dir
+com.daymark.todo.test.app-debugAndroidTest-4 /home/saad/Code/raheel-optics/app/build/intermediates/merged_res/debugAndroidTest/mergeDebugAndroidTestResources
+gradleHome-0 /home/saad/.gradle

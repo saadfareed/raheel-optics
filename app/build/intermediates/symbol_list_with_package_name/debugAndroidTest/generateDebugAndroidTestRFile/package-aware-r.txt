@@ -1,0 +1,3 @@
+com.daymark.todo.test
+string app_name
+string brand_tagline

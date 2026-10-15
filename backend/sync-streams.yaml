@@ -1,0 +1,10 @@
+config:
+  edition: 3
+streams:
+  working_set:
+    auto_subscribe: true
+    queries:
+      - SELECT id, body, revision FROM active_todos WHERE user_id = auth.user_id()
+      - SELECT * FROM user_totals WHERE id = auth.user_id()
+# History is fetched in bounded pages through RLS-protected history_page.
+# operation_requests is a client insert-only command, not a replicated server table.

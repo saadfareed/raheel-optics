@@ -1,0 +1,4 @@
+<!-- Material icon, AndroidX 1.7.8. Apache-2.0; see NOTICE-ICONS. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24.0" android:viewportHeight="24.0">
+    <path android:fillColor="#FF000000" android:fillAlpha="1.0" android:fillType="nonZero" android:pathData="M 18.0,8.0 h -1.0 L 17.0,6.0 c 0.0,-2.76,-2.24,-5.0,-5.0,-5.0 S 7.0,3.24,7.0,6.0 v 2.0 L 6.0,8.0 c -1.1,0.0,-2.0,0.9,-2.0,2.0 v 10.0 c 0.0,1.1,0.9,2.0,2.0,2.0 h 12.0 c 1.1,0.0,2.0,-0.9,2.0,-2.0 L 20.0,10.0 c 0.0,-1.1,-0.9,-2.0,-2.0,-2.0 Z M 9.0,6.0 c 0.0,-1.66,1.34,-3.0,3.0,-3.0 s 3.0,1.34,3.0,3.0 v 2.0 L 9.0,8.0 L 9.0,6.0 Z M 18.0,20.0 L 6.0,20.0 L 6.0,10.0 h 12.0 v 10.0 Z M 12.0,17.0 c 1.1,0.0,2.0,-0.9,2.0,-2.0 s -0.9,-2.0,-2.0,-2.0 s -2.0,0.9,-2.0,2.0 s 0.9,2.0,2.0,2.0 Z" />
+</vector>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <bool name="light_system_bars">true</bool>
+    <color name="launcher_background">#061F2D</color>
+    <color name="splash_background_color">#F5F9FC</color>
+    <item name="themed_splash_logo" type="drawable">@drawable/raheel_optics_logo</item>
+    <string name="app_name" translatable="false">Raheel Optics</string>
+    <string name="brand_tagline" translatable="false">Clear vision. Personal care.</string>
+    <style name="Theme.Daymark" parent="Theme.Daymark.Base"/>
+    <style name="Theme.Daymark.Base" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">@bool/light_system_bars</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:colorAccent">#286A56</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
+</resources>

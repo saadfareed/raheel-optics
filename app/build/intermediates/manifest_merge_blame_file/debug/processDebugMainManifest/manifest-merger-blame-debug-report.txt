@@ -1,0 +1,353 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="pk.raheeloptics.orders"
+4    android:versionCode="9"
+5    android:versionName="1.5.1" >
+6
+7    <uses-sdk
+7-->INJECTED
+8        android:minSdkVersion="26"
+8-->INJECTED
+9        android:targetSdkVersion="37" />
+9-->INJECTED
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:2:5-67
+11-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:2:22-64
+12    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+12-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:3:5-79
+12-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:3:22-76
+13    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+13-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:4:5-77
+13-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:4:22-74
+14    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+14-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:5:5-81
+14-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:5:22-78
+15    <uses-permission android:name="android.permission.WAKE_LOCK" />
+15-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:23:5-68
+15-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:23:22-65
+16    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+16-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:26:5-77
+16-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:26:22-74
+17
+18    <permission
+18-->[androidx.core:core:1.18.0] /home/saad/.gradle/caches/9.8.1/transforms/addae7bacac8343239a33af29d49ad77/transformed/core-1.18.0/AndroidManifest.xml:22:5-24:47
+19        android:name="pk.raheeloptics.orders.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+19-->[androidx.core:core:1.18.0] /home/saad/.gradle/caches/9.8.1/transforms/addae7bacac8343239a33af29d49ad77/transformed/core-1.18.0/AndroidManifest.xml:23:9-81
+20        android:protectionLevel="signature" />
+20-->[androidx.core:core:1.18.0] /home/saad/.gradle/caches/9.8.1/transforms/addae7bacac8343239a33af29d49ad77/transformed/core-1.18.0/AndroidManifest.xml:24:9-44
+21
+22    <uses-permission android:name="pk.raheeloptics.orders.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+22-->[androidx.core:core:1.18.0] /home/saad/.gradle/caches/9.8.1/transforms/addae7bacac8343239a33af29d49ad77/transformed/core-1.18.0/AndroidManifest.xml:26:5-97
+22-->[androidx.core:core:1.18.0] /home/saad/.gradle/caches/9.8.1/transforms/addae7bacac8343239a33af29d49ad77/transformed/core-1.18.0/AndroidManifest.xml:26:22-94
+23
+24    <application
+24-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:5-17:19
+25        android:name="com.daymark.todo.DaymarkApp"
+25-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:18-44
+26        android:allowBackup="false"
+26-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:45-72
+27        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+27-->[androidx.core:core:1.18.0] /home/saad/.gradle/caches/9.8.1/transforms/addae7bacac8343239a33af29d49ad77/transformed/core-1.18.0/AndroidManifest.xml:28:18-86
+28        android:dataExtractionRules="@xml/data_extraction_rules"
+28-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:107-163
+29        android:debuggable="true"
+30        android:extractNativeLibs="false"
+30-->INJECTED
+31        android:fullBackupContent="false"
+31-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:73-106
+32        android:icon="@mipmap/ic_launcher"
+32-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:197-231
+33        android:label="@string/app_name"
+33-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:164-196
+34        android:roundIcon="@mipmap/ic_launcher"
+34-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:232-271
+35        android:supportsRtl="true"
+35-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:346-372
+36        android:theme="@style/Theme.Daymark"
+36-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:272-308
+37        android:usesCleartextTraffic="false" >
+37-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:6:309-345
+38
+39        <!--
+40             DaymarkApp initializes Sentry only when SENTRY_DSN is configured. The SDK's
+41             provider runs before Application.onCreate and rejects a missing DSN.
+42        -->
+43        <meta-data
+43-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:9:9-79
+44            android:name="io.sentry.auto-init"
+44-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:9:20-54
+45            android:value="false" />
+45-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:9:55-76
+46
+47        <activity
+47-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:10:9-12:20
+48            android:name="com.daymark.todo.MainActivity"
+48-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:10:19-47
+49            android:exported="true"
+49-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:10:48-71
+50            android:launchMode="singleTop" >
+50-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:10:72-102
+51            <intent-filter>
+51-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:11:13-156
+52                <action android:name="android.intent.action.MAIN" />
+52-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:11:28-80
+52-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:11:36-77
+53
+54                <category android:name="android.intent.category.LAUNCHER" />
+54-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:11:80-140
+54-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:11:90-137
+55            </intent-filter>
+56        </activity>
+57
+58        <receiver
+58-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:13:9-89
+59            android:name="com.daymark.todo.reminders.ReminderReceiver"
+59-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:13:19-61
+60            android:exported="false" />
+60-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:13:62-86
+61        <receiver
+61-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:14:9-16:20
+62            android:name="com.daymark.todo.reminders.BootReceiver"
+62-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:14:19-57
+63            android:exported="true" >
+63-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:14:58-81
+64            <intent-filter>
+64-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:13-293
+65                <action android:name="android.intent.action.BOOT_COMPLETED" />
+65-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:28-90
+65-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:36-87
+66                <action android:name="android.intent.action.TIME_SET" />
+66-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:90-146
+66-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:98-143
+67                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+67-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:146-210
+67-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:154-207
+68                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+68-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:210-277
+68-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:218-274
+69            </intent-filter>
+70        </receiver>
+71
+72        <provider
+72-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:29:9-37:20
+73            android:name="androidx.startup.InitializationProvider"
+73-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:30:13-67
+74            android:authorities="pk.raheeloptics.orders.androidx-startup"
+74-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:31:13-68
+75            android:exported="false" >
+75-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:32:13-37
+76            <meta-data
+76-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:34:13-36:52
+77                android:name="androidx.work.WorkManagerInitializer"
+77-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:35:17-68
+78                android:value="androidx.startup" />
+78-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:36:17-49
+79            <meta-data
+79-->[androidx.emoji2:emoji2:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/2f8b506f6bc62dd8848204e6098ae1bc/transformed/emoji2-1.4.0/AndroidManifest.xml:29:13-31:52
+80                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+80-->[androidx.emoji2:emoji2:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/2f8b506f6bc62dd8848204e6098ae1bc/transformed/emoji2-1.4.0/AndroidManifest.xml:30:17-75
+81                android:value="androidx.startup" />
+81-->[androidx.emoji2:emoji2:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/2f8b506f6bc62dd8848204e6098ae1bc/transformed/emoji2-1.4.0/AndroidManifest.xml:31:17-49
+82            <meta-data
+82-->[androidx.lifecycle:lifecycle-process:2.11.0] /home/saad/.gradle/caches/9.8.1/transforms/1eb8687d9ac672570940303a6539eae4/transformed/lifecycle-process-2.11.0/AndroidManifest.xml:29:13-31:52
+83                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+83-->[androidx.lifecycle:lifecycle-process:2.11.0] /home/saad/.gradle/caches/9.8.1/transforms/1eb8687d9ac672570940303a6539eae4/transformed/lifecycle-process-2.11.0/AndroidManifest.xml:30:17-78
+84                android:value="androidx.startup" />
+84-->[androidx.lifecycle:lifecycle-process:2.11.0] /home/saad/.gradle/caches/9.8.1/transforms/1eb8687d9ac672570940303a6539eae4/transformed/lifecycle-process-2.11.0/AndroidManifest.xml:31:17-49
+85            <meta-data
+85-->[com.squareup.okhttp3:okhttp-android:5.5.0] /home/saad/.gradle/caches/9.8.1/transforms/93b2fd8e37c069cf9e07e22329537738/transformed/okhttp/AndroidManifest.xml:16:13-18:52
+86                android:name="okhttp3.internal.platform.PlatformInitializer"
+86-->[com.squareup.okhttp3:okhttp-android:5.5.0] /home/saad/.gradle/caches/9.8.1/transforms/93b2fd8e37c069cf9e07e22329537738/transformed/okhttp/AndroidManifest.xml:17:17-77
+87                android:value="androidx.startup" />
+87-->[com.squareup.okhttp3:okhttp-android:5.5.0] /home/saad/.gradle/caches/9.8.1/transforms/93b2fd8e37c069cf9e07e22329537738/transformed/okhttp/AndroidManifest.xml:18:17-49
+88            <meta-data
+88-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:29:13-31:52
+89                android:name="androidx.profileinstaller.ProfileInstallerInitializer"
+89-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:30:17-85
+90                android:value="androidx.startup" />
+90-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:31:17-49
+91        </provider>
+92
+93        <service
+93-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:39:9-45:35
+94            android:name="androidx.work.impl.background.systemjob.SystemJobService"
+94-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:40:13-84
+95            android:directBootAware="false"
+95-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:41:13-44
+96            android:enabled="@bool/enable_system_job_service_default"
+96-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:42:13-70
+97            android:exported="true"
+97-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:43:13-36
+98            android:permission="android.permission.BIND_JOB_SERVICE" />
+98-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:44:13-69
+99        <service
+99-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:46:9-52:35
+100            android:name="androidx.work.impl.foreground.SystemForegroundService"
+100-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:47:13-81
+101            android:directBootAware="false"
+101-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:48:13-44
+102            android:enabled="@bool/enable_system_foreground_service_default"
+102-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:49:13-77
+103            android:exported="false" />
+103-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:50:13-37
+104
+105        <receiver
+105-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:54:9-59:35
+106            android:name="androidx.work.impl.utils.ForceStopRunnable$BroadcastReceiver"
+106-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:55:13-88
+107            android:directBootAware="false"
+107-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:56:13-44
+108            android:enabled="true"
+108-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:57:13-35
+109            android:exported="false" />
+109-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:58:13-37
+110        <receiver
+110-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:60:9-69:20
+111            android:name="androidx.work.impl.background.systemalarm.RescheduleReceiver"
+111-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:61:13-88
+112            android:directBootAware="false"
+112-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:62:13-44
+113            android:enabled="false"
+113-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:63:13-36
+114            android:exported="false" >
+114-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:64:13-37
+115            <intent-filter>
+115-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:66:13-68:29
+116                <action android:name="android.intent.action.BOOT_COMPLETED" />
+116-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:28-90
+116-->/home/saad/Code/raheel-optics/app/src/main/AndroidManifest.xml:15:36-87
+117            </intent-filter>
+118        </receiver>
+119        <receiver
+119-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:70:9-80:20
+120            android:name="androidx.work.impl.diagnostics.DiagnosticsReceiver"
+120-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:71:13-78
+121            android:directBootAware="false"
+121-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:72:13-44
+122            android:enabled="true"
+122-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:73:13-35
+123            android:exported="true"
+123-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:74:13-36
+124            android:permission="android.permission.DUMP" >
+124-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:75:13-57
+125            <intent-filter>
+125-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:77:13-79:29
+126                <action android:name="androidx.work.diagnostics.REQUEST_DIAGNOSTICS" />
+126-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:78:17-88
+126-->[androidx.work:work-runtime:2.12.0] /home/saad/.gradle/caches/9.8.1/transforms/ce890d3813e24a07628c081caa6d6877/transformed/work-runtime-2.12.0/AndroidManifest.xml:78:25-85
+127            </intent-filter>
+128        </receiver> <!-- 'android:authorities' must be unique in the device, across all apps -->
+129        <provider
+129-->[io.sentry:sentry-android-core:8.61.0] /home/saad/.gradle/caches/9.8.1/transforms/3120e0bf311586d8ce289c50eda1d99a/transformed/sentry-android-core-8.61.0/AndroidManifest.xml:12:9-15:40
+130            android:name="io.sentry.android.core.SentryInitProvider"
+130-->[io.sentry:sentry-android-core:8.61.0] /home/saad/.gradle/caches/9.8.1/transforms/3120e0bf311586d8ce289c50eda1d99a/transformed/sentry-android-core-8.61.0/AndroidManifest.xml:13:13-69
+131            android:authorities="pk.raheeloptics.orders.SentryInitProvider"
+131-->[io.sentry:sentry-android-core:8.61.0] /home/saad/.gradle/caches/9.8.1/transforms/3120e0bf311586d8ce289c50eda1d99a/transformed/sentry-android-core-8.61.0/AndroidManifest.xml:14:13-70
+132            android:exported="false" />
+132-->[io.sentry:sentry-android-core:8.61.0] /home/saad/.gradle/caches/9.8.1/transforms/3120e0bf311586d8ce289c50eda1d99a/transformed/sentry-android-core-8.61.0/AndroidManifest.xml:15:13-37
+133        <provider
+133-->[io.sentry:sentry-android-core:8.61.0] /home/saad/.gradle/caches/9.8.1/transforms/3120e0bf311586d8ce289c50eda1d99a/transformed/sentry-android-core-8.61.0/AndroidManifest.xml:16:9-20:39
+134            android:name="io.sentry.android.core.SentryPerformanceProvider"
+134-->[io.sentry:sentry-android-core:8.61.0] /home/saad/.gradle/caches/9.8.1/transforms/3120e0bf311586d8ce289c50eda1d99a/transformed/sentry-android-core-8.61.0/AndroidManifest.xml:17:13-76
+135            android:authorities="pk.raheeloptics.orders.SentryPerformanceProvider"
+135-->[io.sentry:sentry-android-core:8.61.0] /home/saad/.gradle/caches/9.8.1/transforms/3120e0bf311586d8ce289c50eda1d99a/transformed/sentry-android-core-8.61.0/AndroidManifest.xml:18:13-77
+136            android:exported="false"
+136-->[io.sentry:sentry-android-core:8.61.0] /home/saad/.gradle/caches/9.8.1/transforms/3120e0bf311586d8ce289c50eda1d99a/transformed/sentry-android-core-8.61.0/AndroidManifest.xml:19:13-37
+137            android:initOrder="200" />
+137-->[io.sentry:sentry-android-core:8.61.0] /home/saad/.gradle/caches/9.8.1/transforms/3120e0bf311586d8ce289c50eda1d99a/transformed/sentry-android-core-8.61.0/AndroidManifest.xml:20:13-36
+138
+139        <uses-library
+139-->[androidx.window:window:1.5.0] /home/saad/.gradle/caches/9.8.1/transforms/c303d973b6e0e70b3b40536de63c93dc/transformed/window-1.5.0/AndroidManifest.xml:23:9-25:40
+140            android:name="androidx.window.extensions"
+140-->[androidx.window:window:1.5.0] /home/saad/.gradle/caches/9.8.1/transforms/c303d973b6e0e70b3b40536de63c93dc/transformed/window-1.5.0/AndroidManifest.xml:24:13-54
+141            android:required="false" />
+141-->[androidx.window:window:1.5.0] /home/saad/.gradle/caches/9.8.1/transforms/c303d973b6e0e70b3b40536de63c93dc/transformed/window-1.5.0/AndroidManifest.xml:25:13-37
+142        <uses-library
+142-->[androidx.window:window:1.5.0] /home/saad/.gradle/caches/9.8.1/transforms/c303d973b6e0e70b3b40536de63c93dc/transformed/window-1.5.0/AndroidManifest.xml:26:9-28:40
+143            android:name="androidx.window.sidecar"
+143-->[androidx.window:window:1.5.0] /home/saad/.gradle/caches/9.8.1/transforms/c303d973b6e0e70b3b40536de63c93dc/transformed/window-1.5.0/AndroidManifest.xml:27:13-51
+144            android:required="false" />
+144-->[androidx.window:window:1.5.0] /home/saad/.gradle/caches/9.8.1/transforms/c303d973b6e0e70b3b40536de63c93dc/transformed/window-1.5.0/AndroidManifest.xml:28:13-37
+145
+146        <activity
+146-->[androidx.compose.ui:ui-tooling-android:1.12.1] /home/saad/.gradle/caches/9.8.1/transforms/eb15ecdabd832affefba5af76651428e/transformed/ui-tooling/AndroidManifest.xml:23:9-25:39
+147            android:name="androidx.compose.ui.tooling.PreviewActivity"
+147-->[androidx.compose.ui:ui-tooling-android:1.12.1] /home/saad/.gradle/caches/9.8.1/transforms/eb15ecdabd832affefba5af76651428e/transformed/ui-tooling/AndroidManifest.xml:24:13-71
+148            android:exported="true" />
+148-->[androidx.compose.ui:ui-tooling-android:1.12.1] /home/saad/.gradle/caches/9.8.1/transforms/eb15ecdabd832affefba5af76651428e/transformed/ui-tooling/AndroidManifest.xml:25:13-36
+149        <activity
+149-->[androidx.compose.ui:ui-test-manifest:1.12.1] /home/saad/.gradle/caches/9.8.1/transforms/8c5a4eff307bcd3b89a4d95feecf2690/transformed/ui-test-manifest-1.12.1/AndroidManifest.xml:23:9-26:79
+150            android:name="androidx.activity.ComponentActivity"
+150-->[androidx.compose.ui:ui-test-manifest:1.12.1] /home/saad/.gradle/caches/9.8.1/transforms/8c5a4eff307bcd3b89a4d95feecf2690/transformed/ui-test-manifest-1.12.1/AndroidManifest.xml:24:13-63
+151            android:exported="true"
+151-->[androidx.compose.ui:ui-test-manifest:1.12.1] /home/saad/.gradle/caches/9.8.1/transforms/8c5a4eff307bcd3b89a4d95feecf2690/transformed/ui-test-manifest-1.12.1/AndroidManifest.xml:25:13-36
+152            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+152-->[androidx.compose.ui:ui-test-manifest:1.12.1] /home/saad/.gradle/caches/9.8.1/transforms/8c5a4eff307bcd3b89a4d95feecf2690/transformed/ui-test-manifest-1.12.1/AndroidManifest.xml:26:13-76
+153
+154        <service
+154-->[androidx.room:room-runtime-android:2.7.0] /home/saad/.gradle/caches/9.8.1/transforms/fe59cad09898c1cbd7cae2a1275b0c80/transformed/room-runtime-release/AndroidManifest.xml:24:9-28:63
+155            android:name="androidx.room.MultiInstanceInvalidationService"
+155-->[androidx.room:room-runtime-android:2.7.0] /home/saad/.gradle/caches/9.8.1/transforms/fe59cad09898c1cbd7cae2a1275b0c80/transformed/room-runtime-release/AndroidManifest.xml:25:13-74
+156            android:directBootAware="true"
+156-->[androidx.room:room-runtime-android:2.7.0] /home/saad/.gradle/caches/9.8.1/transforms/fe59cad09898c1cbd7cae2a1275b0c80/transformed/room-runtime-release/AndroidManifest.xml:26:13-43
+157            android:exported="false" />
+157-->[androidx.room:room-runtime-android:2.7.0] /home/saad/.gradle/caches/9.8.1/transforms/fe59cad09898c1cbd7cae2a1275b0c80/transformed/room-runtime-release/AndroidManifest.xml:27:13-37
+158
+159        <receiver
+159-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:34:9-52:20
+160            android:name="androidx.profileinstaller.ProfileInstallReceiver"
+160-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:35:13-76
+161            android:directBootAware="false"
+161-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:36:13-44
+162            android:enabled="true"
+162-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:37:13-35
+163            android:exported="true"
+163-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:38:13-36
+164            android:permission="android.permission.DUMP" >
+164-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:39:13-57
+165            <intent-filter>
+165-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:40:13-42:29
+166                <action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+166-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:17-91
+166-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:41:25-88
+167            </intent-filter>
+168            <intent-filter>
+168-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:43:13-45:29
+169                <action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+169-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:17-85
+169-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:44:25-82
+170            </intent-filter>
+171            <intent-filter>
+171-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:46:13-48:29
+172                <action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+172-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:17-88
+172-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:47:25-85
+173            </intent-filter>
+174            <intent-filter>
+174-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:49:13-51:29
+175                <action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+175-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:17-95
+175-->[androidx.profileinstaller:profileinstaller:1.4.0] /home/saad/.gradle/caches/9.8.1/transforms/76295aa6888e590a20db1a6d710b2e4c/transformed/profileinstaller-1.4.0/AndroidManifest.xml:50:25-92
+176            </intent-filter>
+177        </receiver>
+178        <!--
+179         Must run before the managed runtime provider emitted by dotnet/android
+180         so that sentry-native is already in the signal chain when the runtime
+181         installs its own handlers. 
+182         initOrder must stay higher than AppInitOrder-1 (1999999999) used by the .NET runtime:
+183         https://github.com/dotnet/android/blob/3c50ff4573b5/src/Xamarin.Android.Build.Tasks/Utilities/ManifestDocument.cs#L724
+184        -->
+185        <provider
+185-->[io.sentry:sentry-native-ndk:0.17.3] /home/saad/.gradle/caches/9.8.1/transforms/c1134b26752669a8d1fe3ca1af0f0495/transformed/sentry-native-ndk-0.17.3/AndroidManifest.xml:16:9-20:46
+186            android:name="io.sentry.ndk.SentryNdkPreloadProvider"
+186-->[io.sentry:sentry-native-ndk:0.17.3] /home/saad/.gradle/caches/9.8.1/transforms/c1134b26752669a8d1fe3ca1af0f0495/transformed/sentry-native-ndk-0.17.3/AndroidManifest.xml:17:13-66
+187            android:authorities="pk.raheeloptics.orders.SentryNdkPreloadProvider"
+187-->[io.sentry:sentry-native-ndk:0.17.3] /home/saad/.gradle/caches/9.8.1/transforms/c1134b26752669a8d1fe3ca1af0f0495/transformed/sentry-native-ndk-0.17.3/AndroidManifest.xml:18:13-76
+188            android:exported="false"
+188-->[io.sentry:sentry-native-ndk:0.17.3] /home/saad/.gradle/caches/9.8.1/transforms/c1134b26752669a8d1fe3ca1af0f0495/transformed/sentry-native-ndk-0.17.3/AndroidManifest.xml:19:13-37
+189            android:initOrder="2000000000" />
+189-->[io.sentry:sentry-native-ndk:0.17.3] /home/saad/.gradle/caches/9.8.1/transforms/c1134b26752669a8d1fe3ca1af0f0495/transformed/sentry-native-ndk-0.17.3/AndroidManifest.xml:20:13-43
+190    </application>
+191
+192</manifest>

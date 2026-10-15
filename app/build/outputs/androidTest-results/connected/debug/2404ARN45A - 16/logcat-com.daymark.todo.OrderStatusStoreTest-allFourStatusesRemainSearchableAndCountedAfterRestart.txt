@@ -1,0 +1,22 @@
+10-15 19:26:35.700 24696 24737 I TestRunner: started: allFourStatusesRemainSearchableAndCountedAfterRestart(com.daymark.todo.OrderStatusStoreTest)
+10-15 19:26:35.748 19601 21305 D AudioTrackImpl: [audioTrackData][mute] 54s(f:0 m:54065 s:0 k:54065 z:0) : pid 19601 uid 10350 sessionId 13801 sr 44100 ch 2 fmt 1
+10-15 19:26:35.781 24696 24735 D nativeloader: Load /data/app/~~WKDsck1rJCptHEaIam9izQ==/pk.raheeloptics.orders-LnkDNsYL2_EFuIM7KihrIg==/base.apk!/lib/arm64-v8a/libsqliteJni.so using class loader ns clns-10 (caller=/data/app/~~WKDsck1rJCptHEaIam9izQ==/pk.raheeloptics.orders-LnkDNsYL2_EFuIM7KihrIg==/base.apk!classes13.dex): ok
+10-15 19:26:35.792  1086  1558 W libc    : Access denied finding property "ro.vendor.display.max_hdr_luminance"
+10-15 19:26:35.972   983   983 I hwcomposer: [HWCDisplay] (0 updateFps():3667), (type:1, mode:2) fps:60.036606,dur:1016.05,max:18.36,min:15.11  
+10-15 19:26:36.025  1086  1558 W libc    : Access denied finding property "ro.vendor.display.max_hdr_luminance"
+10-15 19:26:36.193  1015  1078 I libPerfCtl: xgfGetFPS pid:2491 fps:-1
+10-15 19:26:36.193  1015  1078 I libPerfCtl: xgfGetFPS pid:19601 fps:-1
+10-15 19:26:36.223  1719  2564 D ConnectivityService: Returning BLOCKED NetworkInfo to uid=10176
+10-15 19:26:36.226  1086  1558 W libc    : Access denied finding property "ro.vendor.display.max_hdr_luminance"
+10-15 19:26:36.286  4367  4652 I AudioManager: In isBluetoothScoOn() calling application: com.huaqin.sarcontroller
+10-15 19:26:36.287  1719  2564 D AS.BtHelper: isBluetoothScoOn() mBluetoothHeadset is null: truemBluetoothHeadsetDevice is null: true
+10-15 19:26:36.287  1719  2564 V AS.AudioDeviceBroker: isBluetoothScoOn return false when sco/ble device is not connect.
+10-15 19:26:36.289  1719  2592 V AS.AudioDeviceBroker: requestedCommunicationDevice: null mode owner pid: 0 crc: null
+10-15 19:26:36.289  4367  4652 I AudioManager: In isSpeakerphoneOn() calling application: com.huaqin.sarcontroller
+10-15 19:26:36.290  1719  2592 D AS.BtHelper: isBluetoothScoOn() mBluetoothHeadset is null: truemBluetoothHeadsetDevice is null: true
+10-15 19:26:36.290  1719  2592 V AS.AudioDeviceBroker: requestedCommunicationDevice: null mode owner pid: 0 crc: null
+10-15 19:26:36.290  4367  4652 V AudioManager: direct return isWiredHeadsetOn from audioservice/audiodeviceinventory, get directly to avoid waiting too long.
+10-15 19:26:36.337  1086  1086 I BufferQueueProducer: [com.instagram.android/com.instagram.android.activity.MainTabActivity#19443](this:0xb4000071e0f6a6d0,id:-1,api:0,p:-1,c:1086) queueBuffer: fps=59.07 dur=1015.69 max=33.33 min=15.99
+10-15 19:26:36.387  1086  1086 I BufferQueueProducer: [[BBQ] 23318e9#19456#19460](this:0xb4000071e0ffba80,id:-1,api:0,p:-1,c:1086) queueBuffer: fps=30.02 dur=1032.72 max=33.88 min=32.77
+10-15 19:26:36.460  1086  1558 W libc    : Access denied finding property "ro.vendor.display.max_hdr_luminance"
+10-15 19:26:36.508 24696 24737 I TestRunner: finished: allFourStatusesRemainSearchableAndCountedAfterRestart(com.daymark.todo.OrderStatusStoreTest)

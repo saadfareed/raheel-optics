@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.daymark.todo.AuthRevocationTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-15T14:26:08.873Z" hostname="saad-fareed-sadi" time="0.094">
+  <properties/>
+  <testcase name="persistenceFailureAfterRefreshStillRevokesReceivedToken" classname="com.daymark.todo.AuthRevocationTest" time="0.08"/>
+  <testcase name="inactivityExpiredSessionCanBeRevokedWithoutRestoringAppAccess" classname="com.daymark.todo.AuthRevocationTest" time="0.002"/>
+  <testcase name="expiredAccessTokenRefreshesBeforeLocalScopeRevocation" classname="com.daymark.todo.AuthRevocationTest" time="0.001"/>
+  <testcase name="rejectedAccessTokenRefreshesAndRetriesOnce" classname="com.daymark.todo.AuthRevocationTest" time="0.002"/>
+  <testcase name="aRejectedFreshTokenDoesNotStartAnotherRefreshCycle" classname="com.daymark.todo.AuthRevocationTest" time="0.002"/>
+  <testcase name="localOnlySessionDoesNotContactServer" classname="com.daymark.todo.AuthRevocationTest" time="0.002"/>
+  <testcase name="offlineFailureIsReportedToTheCallerForGuaranteedLocalCleanup" classname="com.daymark.todo.AuthRevocationTest" time="0.002"/>
+  <testcase name="mismatchedRefreshOwnerCannotChangeOrRevokeAnotherAccount" classname="com.daymark.todo.AuthRevocationTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

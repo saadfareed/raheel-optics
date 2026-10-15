@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.Daymark.Base" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">@bool/light_system_bars</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:colorAccent">#286A56</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
+    <style name="Theme.Daymark" parent="Theme.Daymark.Base" />
+</resources>
