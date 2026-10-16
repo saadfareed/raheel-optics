@@ -60,6 +60,8 @@ data class Customer(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = createdAt,
     val revision: Long = 0,
+    val latestPrescription: Prescription? = null,
+    val previousMobiles: List<String> = emptyList(),
 )
 
 @Serializable

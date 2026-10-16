@@ -43,6 +43,8 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         db.readTransaction { tx ->
         output.append("{\"format\":\"daymark-export\",\"version\":1}\n")
         val sources=listOf(
+            "customer" to "SELECT id,body AS payload FROM ($customerProfilesSql)",
+            "customerOperation" to "SELECT id,payload FROM optical_journal",
             "task" to "SELECT id,body AS payload FROM ($effectiveTodos)",
             "history" to "SELECT id,body AS payload FROM history_cache",
             "operation" to "SELECT id,json_object('operation',CASE WHEN json_valid(payload) THEN json(payload) ELSE payload END,'state',state,'message',message) AS payload FROM journal",
@@ -351,6 +353,70 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         }
     }
 
+    suspend fun customerDirectory(query:CustomerDirectoryQuery):List<CustomerDirectoryRow> {
+        val filter=mutableListOf("1=1")
+        val args=mutableListOf<Any?>()
+        if(query.search.isNotBlank()) {
+            val escaped=query.search.trim().lowercase().replace("\\","\\\\").replace("%","\\%").replace("_","\\_")
+            filter += "(lower(json_extract(body,'$.title')) LIKE ? ESCAPE '\\' OR phone LIKE ? ESCAPE '\\')"
+            args += "%$escaped%";args += "%${ListRules.phoneSearch(query.search) ?: escaped}%"
+        }
+        if(query.outstandingOnly) filter += "balance>0"
+        val sort=when(query.sort) {
+            CustomerSort.RECENT -> "last_order DESC"
+            CustomerSort.NEWEST -> "first_order DESC"
+            CustomerSort.NAME_ASC -> "lower(json_extract(body,'$.title')) ASC"
+            CustomerSort.NAME_DESC -> "lower(json_extract(body,'$.title')) DESC"
+            CustomerSort.MOST_ORDERS -> "order_count DESC"
+            CustomerSort.BALANCE -> "balance DESC"
+        }
+        args += ListRules.PageSize+1;args += (query.page.coerceAtLeast(1)-1)*ListRules.PageSize
+        return db.getAll("""
+            WITH profiles AS ($customerProfilesSql), original AS ($allOrders), effective AS (
+              SELECT e.id,e.body,1 AS is_order FROM original e
+              UNION ALL SELECT p.id,json_object('id',p.id,'customerId',p.id,'title',json_extract(p.body,'$.name'),
+                'customerMobile',json_extract(p.body,'$.mobile'),'normalizedMobile',json_extract(p.body,'$.normalizedMobile'),
+                'prescription',json(coalesce(json_extract(p.body,'$.latestPrescription'),'{}')),
+                'orderedAt',json_extract(p.body,'$.createdAt'),'updatedAt',json_extract(p.body,'$.updatedAt')),0
+              FROM profiles p WHERE NOT EXISTS(SELECT 1 FROM original e WHERE json_extract(e.body,'$.customerId')=p.id
+                OR json_extract(e.body,'$.normalizedMobile')=json_extract(p.body,'$.normalizedMobile')
+                OR EXISTS(SELECT 1 FROM json_each(json_extract(p.body,'$.previousMobiles')) WHERE value=json_extract(e.body,'$.normalizedMobile')))
+            ), linked AS (
+              SELECT e.*,(SELECT p.body FROM profiles p WHERE p.id=json_extract(e.body,'$.customerId')
+                OR json_extract(p.body,'$.normalizedMobile')=json_extract(e.body,'$.normalizedMobile')
+                OR EXISTS(SELECT 1 FROM json_each(json_extract(p.body,'$.previousMobiles')) WHERE value=json_extract(e.body,'$.normalizedMobile')) LIMIT 1) AS profile
+              FROM effective e
+            ), tagged AS (
+              SELECT id,is_order,profile,
+                CASE WHEN profile IS NULL THEN body ELSE json_set(body,'$.title',json_extract(profile,'$.name'),
+                  '$.customerMobile',json_extract(profile,'$.mobile'),'$.normalizedMobile',json_extract(profile,'$.normalizedMobile'),
+                  '$.customerId',json_extract(profile,'$.id'),'$.prescription',json(coalesce(json_extract(profile,'$.latestPrescription'),json_extract(body,'$.prescription'),'{}'))) END AS body,
+                coalesce(json_extract(profile,'$.id'),json_extract(body,'$.normalizedMobile')) AS identity,
+                coalesce(json_extract(profile,'$.normalizedMobile'),json_extract(body,'$.normalizedMobile')) AS phone,$opticalStatus AS optical_status,
+                coalesce(json_extract(body,'$.orderedAt'),json_extract(body,'$.updatedAt'),0) AS order_time
+              FROM linked WHERE length(coalesce(json_extract(body,'$.normalizedMobile'),''))>0
+            ), ranked AS (
+              SELECT *,row_number() OVER(PARTITION BY identity ORDER BY order_time DESC,coalesce(json_extract(body,'$.updatedAt'),0) DESC,id DESC) AS customer_rank
+              FROM tagged
+            ), totals AS (
+              SELECT identity,sum(is_order) AS order_count,max(order_time) AS last_order,min(coalesce(json_extract(profile,'$.createdAt'),order_time)) AS first_order,
+                sum(CASE WHEN optical_status='CANCEL' THEN 0 ELSE max(0,
+                  coalesce(json_extract(body,'$.amounts.framePaisa'),0)+coalesce(json_extract(body,'$.amounts.lensPaisa'),0)
+                  +coalesce(json_extract(body,'$.amounts.extrasPaisa'),0)-coalesce(json_extract(body,'$.amounts.discountPaisa'),0)
+                  +coalesce(json_extract(body,'$.amounts.taxPaisa'),0)
+                  -coalesce((SELECT sum(json_extract(value,'$.amountPaisa')) FROM json_each(json_extract(body,'$.payments'))),0)) END) AS balance
+              FROM tagged GROUP BY identity
+            ) SELECT ranked.body,order_count,last_order,balance,profile FROM ranked JOIN totals USING(identity)
+              WHERE customer_rank=1 AND ${filter.joinToString(" AND ")}
+              ORDER BY $sort,phone LIMIT ? OFFSET ?
+        """.trimIndent(),args) {
+            val order=json.decodeFromString<Todo>(it.getString(0)!!)
+            val profile=it.getString(4)?.let {body ->json.decodeFromString<Customer>(body)}
+                ?: Customer(UUID.nameUUIDFromBytes("$accountId:customer:${order.normalizedMobile}".toByteArray()).toString(),order.title,order.customerMobile,order.normalizedMobile,createdAt=order.orderedAt,latestPrescription=order.prescription)
+            CustomerDirectoryRow(order.copy(customerId=profile.id),it.getLong(1)!!.toInt(),it.getLong(2)!!,it.getLong(3)!!,profile)
+        }
+    }
+
     suspend fun todoPage(query: TodoQuery = TodoQuery(), cursor: ListCursor? = null, limit: Int = ListRules.PageSize,
                          now: Long = System.currentTimeMillis(), zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): TodoPage {
         require(limit > 0 && limit < Int.MAX_VALUE)
@@ -525,7 +591,8 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
                 } else error("This todo has changed. Open the latest version before editing.")
             }
             val previous = tx.getOptional("SELECT operation_id FROM drafts WHERE id=?", listOf(todo.id)) { it.getString(0)!! }
-            val op = Operation(UUID.randomUUID().toString(), todo.copy(updatedAt = now, revision=if(localOnly) todo.revision else (before?.revision ?: 0)+1), action, before?.revision ?: 0, previous, now, before?.status ?: "absent")
+            val customer=if(action in listOf("create","edit")) OpticalStore(db,accountId,localOnly=localOnly).linkOrderCustomer(tx,todo) else null
+            val op = Operation(UUID.randomUUID().toString(), todo.copy(customerId=customer?.id ?: todo.customerId,updatedAt = now, revision=if(localOnly) todo.revision else (before?.revision ?: 0)+1), action, before?.revision ?: 0, previous, now, before?.status ?: "absent")
             val payload = json.encodeToString(op)
             if (localOnly) {
                 val current=tx.getOptional("SELECT status,revision FROM local_state WHERE id=?",listOf(todo.id)) {it.getString(0)!! to it.getLong(1)!!}

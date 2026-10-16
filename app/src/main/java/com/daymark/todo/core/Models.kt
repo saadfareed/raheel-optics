@@ -26,6 +26,7 @@ data class Todo(
     val orderStatus: OrderStatus = OrderStatus.ACTIVE,
     val orderedAt: Long = System.currentTimeMillis(),
     val deliveredAt: Long? = null,
+    val customerId: String? = null,
 )
 
 @Serializable

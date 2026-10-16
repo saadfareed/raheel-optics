@@ -2,6 +2,7 @@ package com.daymark.todo.sync
 
 import com.daymark.todo.core.*
 import com.daymark.todo.data.TodoStore
+import com.daymark.todo.data.OpticalStore
 import com.daymark.todo.identity.BackendTransport
 import com.daymark.todo.identity.ApiException
 import kotlinx.coroutines.*
@@ -11,6 +12,37 @@ import kotlinx.serialization.json.*
 /** SDK SQLite keeps the durable command queue; Supabase is the only hosted service. */
 class SupabaseSynchronizer(private val store: TodoStore, private val backend: BackendTransport) {
     private val json=Json {ignoreUnknownKeys=true;encodeDefaults=true}
+    private suspend fun uploadCustomerHead():Boolean {
+        val prefix=store.db.getCrudBatch(1) ?: return false
+        val entry=prefix.crud.single()
+        val encoded=entry.opData?.jsonValues?.get("payload")?.jsonPrimitive?.content ?: return false
+        val value=runCatching {json.parseToJsonElement(encoded).jsonObject}.getOrNull() ?: return false
+        if(value["action"]?.jsonPrimitive?.content!=OpticalActions.CUSTOMER_UPSERT) {
+            check(value["payload"]==null || value["todo"]!=null) {"Optical order upload needs the next sync migration. Local work is retained."}
+            return false
+        }
+        check(backend.accountId()==store.accountId && entry.table=="operation_requests") {"Account or queue changed."}
+        val op=json.decodeFromJsonElement<OpticalOperation>(value)
+        check(op.id==entry.id && op.payload is OpticalPayload.CustomerUpsert)
+        val superseded=store.db.getOptional("SELECT state FROM optical_journal WHERE id=?",listOf(op.id)) {it.getString(0)!!}=="superseded"
+        if(superseded) {prefix.complete(null);return true}
+        val result=backend.request("/rest/v1/rpc/upsert_optical_customer",body=buildJsonObject {put("payload",value)},authenticated=true).jsonObject
+        check(backend.accountId()==store.accountId) {"Account changed. Local work is retained."}
+        val profiles=OpticalStore(store.db,store.accountId)
+        if(result["accepted"]!!.jsonPrimitive.boolean) {
+            val customer=json.decodeFromJsonElement<Customer>(result["customer"]!!)
+            check(customer.id==(op.payload as OpticalPayload.CustomerUpsert).customer.id)
+            profiles.acceptCustomer(op,customer)
+        } else {
+            val message=result["message"]?.jsonPrimitive?.content ?: "Customer update needs review."
+            profiles.recordResult(op,false,op.baseRevision,message)
+        }
+        val current=store.db.getCrudBatch(1) ?: error("Queue changed")
+        check(current.crud.single().clientId==entry.clientId)
+        current.complete(null)
+        check(result["accepted"]!!.jsonPrimitive.boolean) {result["message"]?.jsonPrimitive?.content ?: "Customer update needs review."}
+        return true
+    }
     private suspend fun uploadOne(op:Operation):JsonElement = try {
         backend.request("/rest/v1/rpc/apply_operation",body=buildJsonObject {put("payload",json.encodeToJsonElement(op))},authenticated=true)
     } catch(e:ApiException) {
@@ -85,10 +117,13 @@ class SupabaseSynchronizer(private val store: TodoStore, private val backend: Ba
         check(backend.accountId()==store.accountId) {"Account changed. Sign in again."}
         val pause=store.uploadPause()
         if(pause!=null && !forceRefresh) throw pause
+        if(pause==null && uploadCustomerHead()) return true
         val original=if(pause==null) store.db.getCrudBatch(maxOperations) else null
         val operations=mutableListOf<Operation>()
         var bytes=2
         for(entry in original?.crud.orEmpty()) {
+            val raw=entry.opData?.jsonValues?.get("payload")?.jsonPrimitive?.content
+            if(raw!=null && runCatching {json.parseToJsonElement(raw).jsonObject["payload"]!=null}.getOrDefault(false)) break
             val op=try {
                 check(entry.table=="operation_requests")
                 val encoded=entry.opData?.jsonValues?.get("payload")?.jsonPrimitive?.content ?: error("Missing operation")
@@ -172,6 +207,7 @@ class SupabaseSynchronizer(private val store: TodoStore, private val backend: Ba
             existingPause?.let {throw it}
             withTimeout(15000) {
                 repeat(2) {
+                    if(uploadCustomerHead()) {changed=true;return@repeat}
                     var batch=store.db.getCrudBatch(25) ?: return@withTimeout
                     val operations=mutableListOf<Operation>()
                     for(entry in batch.crud) {

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.daymark.todo.DaymarkApp
 import com.daymark.todo.core.*
 import com.daymark.todo.data.TodoStore
+import com.daymark.todo.data.OpticalStore
 import com.daymark.todo.identity.*
 import com.daymark.todo.history.HistoryRules
 import com.daymark.todo.sync.enqueueSync
@@ -52,6 +53,10 @@ data class UiState(
     val sessionIdleDays: Int = 30,
     val importActiveCount: Int? = null,
     val importSkippedCount: Int = 0,
+    val customerQuery:CustomerDirectoryQuery = CustomerDirectoryQuery(),
+    val customers:List<CustomerDirectoryRow> = emptyList(),
+    val customersMore:Boolean = false,
+    val customerConflicts:Set<String> = emptySet(),
 )
 
 @OptIn(kotlinx.coroutines.FlowPreview::class)
@@ -207,7 +212,7 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         app.refreshReminders(); refresh()
         observers=viewModelScope.launch {
             launch {
-                workspace.db.onChange(setOf("active_todos","server_todos","server_totals","drafts","journal","history_cache","user_totals","local_totals","quarantined_changes"))
+                workspace.db.onChange(setOf("active_todos","server_todos","server_totals","drafts","journal","history_cache","user_totals","local_totals","quarantined_changes","optical_drafts","optical_customer_cache","optical_journal"))
                     .conflate().debounce(75).onEach {
                         try {refresh()}
                         catch(e:CancellationException) {throw e}
@@ -257,6 +262,9 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         val historyAnchor=savedHistoryPages.cursor
         val todos=workspace.todoPage(query,cursor=taskAnchor)
         val cached=workspace.historyPage(cursor=historyAnchor,limit=ListRules.PageSize)
+        val customerQuery=mutable.value.customerQuery
+        val customers=workspace.customerDirectory(customerQuery)
+        val customerConflicts=workspace.db.getAll("SELECT DISTINCT json_extract(payload,'$.payload.customer.id') FROM optical_journal WHERE state='conflict' AND json_extract(payload,'$.payload.customer.id') IS NOT NULL") {it.getString(0)!!}.toSet()
         var snapshot=workspace.uiSnapshot(todos.items,cached.items,mutable.value.olderHistory.map {it.todo.id},conflictOffset=conflictOffset)
         if(conflictOffset>0 && snapshot.pending.isEmpty()) {
             conflictOffset=0
@@ -270,6 +278,9 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
                 if(it.historyPageNumber==1) snapshot.history.filter {entry -> entry.pending} else emptyList(),it.olderHistory))
                 else HistoryRules.latest(cached.items)
             it.copy(snapshot=snapshot,loading=false,todos=todos.items,todosMore=todos.next!=null,
+                customers=if(it.customerQuery==customerQuery) customers.take(ListRules.PageSize) else it.customers,
+                customersMore=if(it.customerQuery==customerQuery) customers.size>ListRules.PageSize else it.customersMore,
+                customerConflicts=customerConflicts,
                 todoPageNumber=todoPages.number,todoPrevious=todoPages.canPrevious,
                 conflictPageNumber=conflictOffset/ListRules.PageSize+1,
                 savedHistoryPrevious=savedHistoryPages.canPrevious,
@@ -353,6 +364,50 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         if(!workspace.localOnly) enqueueSync(app)
         refresh()
     }
+    fun openCustomers() {
+        val workspace=store ?: return
+        if(workspace.localOnly) {updateCustomers(mutable.value.customerQuery);return}
+        viewModelScope.launch {
+            try {
+                var after="00000000-0000-0000-0000-000000000000"
+                repeat(1000) {
+                    val rows=app.auth.request("/rest/v1/rpc/optical_customer_page",body=buildJsonObject {put("after_id",after)},authenticated=true)
+                        .jsonArray.map {json.decodeFromJsonElement<Customer>(it)}
+                    if(store!==workspace) return@launch
+                    OpticalStore(workspace.db,workspace.accountId).cacheCustomers(rows)
+                    if(rows.size<100) {refresh(false);return@launch}
+                    after=rows.last().id
+                }
+                refresh(false)
+            } catch(e:CancellationException) {throw e}
+            catch(_:Exception) {mutable.update {it.copy(message="Showing customers on this device. Cloud customer refresh is unavailable.")}}
+        }
+    }
+
+    fun resolveCustomerConflict(id:String,keepLocal:Boolean,onSaved:()->Unit)=action {
+        val workspace=store ?: error("Open your shop first.")
+        OpticalStore(workspace.db,workspace.accountId,localOnly=workspace.localOnly).resolveCustomerConflict(id,keepLocal)
+        if(!workspace.localOnly) enqueueSync(app)
+        refresh();onSaved()
+    }
+
+    fun saveCustomer(customer:Customer,onSaved:()->Unit)=action {
+        val workspace=store ?: error("Open your shop first.")
+        val profiles=OpticalStore(workspace.db,workspace.accountId,localOnly=workspace.localOnly)
+        if(customer.id in mutable.value.customerConflicts) profiles.retryCustomerChanges(customer) else profiles.upsertCustomer(customer)
+        if(!workspace.localOnly) enqueueSync(app)
+        refresh();onSaved()
+    }
+
+    fun updateCustomers(query:CustomerDirectoryQuery) {
+        mutable.update {it.copy(customerQuery=query)}
+        viewModelScope.launch {
+            try {refresh(analyticsChanged=false)}
+            catch(e:CancellationException) {throw e}
+            catch(_:Exception) {mutable.update {it.copy(message="Couldn't load customers. Try again.")}}
+        }
+    }
+
     fun updateQuery(query:TodoQuery) {
         if(mutable.value.query==query) return
         todoJob?.cancel()

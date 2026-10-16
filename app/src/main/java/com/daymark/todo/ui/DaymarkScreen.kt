@@ -33,6 +33,7 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
@@ -151,6 +152,7 @@ fun DaymarkScreen(target:String?,consumeTarget:()->Unit,model:TodoViewModel=view
     val todoSaver=remember { Saver<Todo?,String>(save={it?.let(codec::encodeToString) ?: ""},restore={if(it.isBlank()) null else codec.decodeFromString<Todo>(it)}) }
     var editor by rememberSaveable(stateSaver=todoSaver) { mutableStateOf<Todo?>(null) }
     var adding by rememberSaveable { mutableStateOf(false) }
+    var repeatDraft by rememberSaveable(stateSaver=todoSaver) {mutableStateOf<Todo?>(null)}
     var deleting by remember { mutableStateOf<Todo?>(null) }
     var logout by remember { mutableStateOf(false) }
     var allowed by remember { mutableStateOf(app.reminders.allowed()) }
@@ -171,9 +173,9 @@ fun DaymarkScreen(target:String?,consumeTarget:()->Unit,model:TodoViewModel=view
         } else context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,context.packageName))
     }
     LaunchedEffect(state.session?.userId,state.loading) {
-        if(state.session==null && !state.loading) { tab="Orders"; editor=null; adding=false; deleting=null; logout=false }
+        if(state.session==null && !state.loading) { tab="Orders"; editor=null; adding=false; repeatDraft=null; deleting=null; logout=false }
     }
-    LaunchedEffect(tab,state.session?.userId) { if(tab=="Customers" && state.session!=null) model.openHistory() }
+    LaunchedEffect(tab,state.session?.userId) { if(tab=="Customers" && state.session!=null) model.openCustomers() }
     DisposableEffect(tab,state.session?.userId) {onDispose {if(tab=="Customers") model.closeHistory(); if(tab=="Analytics") model.closeAnalytics()}}
     LaunchedEffect(target,state.loading) {
         if(target!=null && !state.loading && state.session!=null) {
@@ -195,7 +197,7 @@ fun DaymarkScreen(target:String?,consumeTarget:()->Unit,model:TodoViewModel=view
             },actions={IconButton(onClick={tab="Inbox"}) {
                 BadgedBox(badge={if(state.snapshot.inbox.any { !it.read }) Badge(containerColor=Coral)}) {Icon(DaymarkIcons.Notifications,"Notifications")}
             }},colors=TopAppBarDefaults.topAppBarColors(containerColor=Paper))},
-            bottomBar={BottomNavigation(tab,{tab=it},{model.dismissMessage();adding=true;editor=null},state.busy || state.loading)}
+            bottomBar={BottomNavigation(tab,{tab=it},{model.dismissMessage();adding=true;editor=null;repeatDraft=null},state.busy || state.loading)}
         ) { padding ->
             Column(Modifier.padding(padding).fillMaxSize()) {
                 state.message?.let {Message(it,model::dismissMessage)}
@@ -203,15 +205,15 @@ fun DaymarkScreen(target:String?,consumeTarget:()->Unit,model:TodoViewModel=view
                 if(state.loading) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {DaymarkLoader()}
                 else when(tab) {
                     "Orders" -> HomeScreen(state,model,{model.dismissMessage();editor=it},{model.transition(it,"complete")},{deleting=it})
-                    "Customers" -> HistoryScreen(state,model,{model.transition(it,"reopen")},{deleting=it})
+                    "Customers" -> CustomersScreen(state,model) {source ->repeatDraft=RepeatOrder.draft(source);editor=null;adding=true;model.dismissMessage()}
                     "Analytics" -> AnalyticsScreen(state,model)
                     "Inbox" -> InboxScreen(state.snapshot,allowed,notificationSettings,model) { id -> model.openTask(id) {todo -> editor=todo; if(todo!=null) tab="Orders"} }
                     else -> SettingsScreen(state,allowed,notificationSettings,model) {logout=true}
                 }
             }
         }
-        if(state.session!=null && (adding || editor!=null)) TodoEditor(editor,state.busy,state.message,{adding=false;editor=null;model.dismissMessage()}) {todo ->
-            model.save(todo,editor) {adding=false;editor=null}
+        if(state.session!=null && (adding || editor!=null)) TodoEditor(editor,state.busy,state.message,{adding=false;editor=null;repeatDraft=null;model.dismissMessage()},repeatDraft) {todo ->
+            model.save(todo,editor) {adding=false;editor=null;repeatDraft=null}
         }
         deleting?.let { todo -> AlertDialog(onDismissRequest={deleting=null},title={Text("Cancel order?")},
             text={Text("The order will stay in your records with status Cancel.")},confirmButton={TextButton(onClick={model.transition(todo,"delete");deleting=null},enabled=!state.busy) {Text("Cancel order",color=MaterialTheme.colorScheme.error)}},
@@ -500,53 +502,99 @@ private fun FilterSheet(query:TodoQuery,dismiss:()->Unit,apply:(TodoQuery)->Unit
 }
 
 @Composable
-private fun HistoryScreen(state:UiState,model:TodoViewModel,reopen:(Todo)->Unit,delete:(Todo)->Unit) {
+private fun CustomersScreen(state:UiState,model:TodoViewModel,newOrder:(Todo)->Unit) {
+    val query=state.customerQuery
+    var sortMenu by remember {mutableStateOf(false)}
+    var editing by remember {mutableStateOf<Customer?>(null)}
     val list=rememberLazyListState()
-    var alphabetical by rememberSaveable {mutableStateOf(false)}
-    LaunchedEffect(state.historyPageNumber) {list.scrollToItem(0)}
+    LaunchedEffect(query) {list.scrollToItem(0)}
     LazyColumn(state=list,contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item {Row(verticalAlignment=Alignment.CenterVertically) {Column(Modifier.weight(1f)) {Text("Customers",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold);Text("Unique customers and their latest prescription",color=Muted,style=MaterialTheme.typography.bodySmall)};FilterChip(selected=alphabetical,onClick={alphabetical=!alphabetical},label={Text(if(alphabetical) "A–Z" else "Newest")})}}
-        if(state.history.isEmpty() && !state.historyLoading) item {
-            EmptyState(if(state.historyError==null) "No customers yet" else "Customers",if(state.historyError==null) "Customers appear here after their first order." else "Connect to load customer records.",DaymarkIcons.Person)
+        item {OutlinedTextField(value=query.search,onValueChange={model.updateCustomers(query.copy(search=it.take(80),page=1))},
+            placeholder={Text("Search name or mobile")},leadingIcon={Icon(DaymarkIcons.Search,null)},
+            trailingIcon={if(query.search.isNotEmpty()) IconButton(onClick={model.updateCustomers(query.copy(search="",page=1))}) {Icon(DaymarkIcons.Close,"Clear search")}},
+            singleLine=true,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth())}
+        item {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+            FilterChip(selected=query.outstandingOnly,onClick={model.updateCustomers(query.copy(outstandingOnly=!query.outstandingOnly,page=1))},label={Text("Balance due")})
+            Spacer(Modifier.weight(1f))
+            Box {
+                TextButton(onClick={sortMenu=true}) {Text(query.sort.label);Icon(DaymarkIcons.ExpandMore,null)}
+                DropdownMenu(expanded=sortMenu,onDismissRequest={sortMenu=false}) {
+                    CustomerSort.entries.forEach {sort ->DropdownMenuItem(text={Text(sort.label)},onClick={model.updateCustomers(query.copy(sort=sort,page=1));sortMenu=false})}
+                }
+            }
+        }}
+        item {Text("Tap a customer to start a new order.",style=MaterialTheme.typography.bodySmall,color=Muted)}
+        if(state.customers.isEmpty()) item {
+            EmptyState("No customers found",if(query.search.isNotBlank() || query.outstandingOnly) "Try another search or remove the balance filter." else "Your first saved order adds a customer here.",DaymarkIcons.Person)
         }
-        val customers=state.history.distinctBy {it.todo.normalizedMobile.ifBlank {it.todo.title.lowercase()}}.let {items -> if(alphabetical) items.sortedBy {it.todo.title.lowercase()} else items}
-        items(customers,key={"customer-${it.todo.normalizedMobile.ifBlank {it.todo.id}}"}) {h ->
-            var expanded by rememberSaveable(h.todo.id) {mutableStateOf(false)}
-            val color=when(h.action) {"delete"->Coral;"reopen"->Violet;else->Mint}
-            Card(onClick={expanded=!expanded},modifier=Modifier.fillMaxWidth().animateItem().animateContentSize(),shape=RoundedCornerShape(22.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        items(state.customers,key={it.customer?.id ?: it.latestOrder.normalizedMobile}) {row ->
+            val customer=row.latestOrder
+            Card(onClick={newOrder(customer)},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Box(Modifier.size(42.dp).background(color.copy(alpha=.1f),RoundedCornerShape(14.dp)),contentAlignment=Alignment.Center) {
-                            Icon(when(h.action) {"delete"->DaymarkIcons.DeleteOutline;"reopen"->DaymarkIcons.Replay;else->DaymarkIcons.CheckCircle},null,tint=color)
+                        Box(Modifier.size(42.dp).background(Violet.copy(alpha=.12f),CircleShape),contentAlignment=Alignment.Center) {Icon(DaymarkIcons.Person,null,tint=Violet)}
+                        Column(Modifier.weight(1f)) {
+                            Text(customer.title,fontWeight=FontWeight.SemiBold)
+                            Text(customer.customerMobile,style=MaterialTheme.typography.bodySmall,color=Muted)
                         }
-                        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
-                            Text(h.todo.title,fontWeight=FontWeight.SemiBold,maxLines=if(expanded) Int.MAX_VALUE else 2,overflow=TextOverflow.Ellipsis)
-                            Text(h.todo.customerMobile.ifBlank {"No mobile saved"},color=color,style=MaterialTheme.typography.labelMedium)
-                        }
-                        Icon(if(expanded) DaymarkIcons.ExpandLess else DaymarkIcons.ExpandMore,null,tint=Muted)
+                        Icon(DaymarkIcons.Add,"New order")
                     }
-                    Text("Last order · ${date(h.todo.orderedAt)}",color=Muted,style=MaterialTheme.typography.labelSmall)
-                    if(expanded) {
-                        Text("Latest prescription",fontWeight=FontWeight.SemiBold)
-                        Text("OD  ${h.todo.prescription.distanceRight.sphere.ifBlank {"—"}}   ·   OS  ${h.todo.prescription.distanceLeft.sphere.ifBlank {"—"}}",color=Muted)
-                        Text("${state.history.count {it.todo.normalizedMobile.isNotBlank() && it.todo.normalizedMobile==h.todo.normalizedMobile}} order record(s) on this page",style=MaterialTheme.typography.labelMedium,color=Muted)
-                    }
+                    Text(if(row.orderCount==0) "No orders stored on this device" else "${row.orderCount} order(s) · Last ${date(row.lastOrderAt)}",style=MaterialTheme.typography.labelSmall,color=Muted)
+                    if(row.balancePaisa>0) Text("Balance PKR ${java.math.BigDecimal.valueOf(row.balancePaisa,2).toPlainString()}",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.error)
+                    row.customer?.let {customer -> TextButton(onClick={model.dismissMessage();editing=customer}) {Text("Customer details")}}
+                    if(row.customer?.id in state.customerConflicts) Text("Customer changes need review",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.labelMedium)
                 }
             }
         }
-        if(state.historyCloudPage) item {TextButton(onClick=model::showSavedHistory,modifier=Modifier.fillMaxWidth()) {Text("Saved history")}}
-        if(state.historyCloudPage && (state.historyPageNumber>1 || state.historyMore)) item {
-            PageControls(state.historyPageNumber,state.cloudHistoryPrevious,state.historyMore,state.historyLoading,model::firstCloudHistory,model::previousHistoryPage,model::nextHistoryPage)
-        } else if(state.historyPageNumber>1 || state.historyMore) item {
-            PageControls(state.historyPageNumber,state.savedHistoryPrevious,state.historyMore,state.historyLoading,model::firstSavedHistory,model::previousSavedHistory,model::loadMoreHistory)
+        if(query.page>1 || state.customersMore) item {
+            PageControls(query.page,query.page>1,state.customersMore,state.busy,
+                {model.updateCustomers(query.copy(page=1))},
+                {model.updateCustomers(query.copy(page=(query.page-1).coerceAtLeast(1)))},
+                {model.updateCustomers(query.copy(page=query.page+1))})
         }
-        if(state.historyLoading) item {Box(Modifier.fillMaxWidth().padding(12.dp),contentAlignment=Alignment.Center) {DaymarkLoader(Modifier.size(22.dp),label="Loading customers")}}
-        if(state.historyError!=null) item {
-            Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(20.dp)) {Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
-                Icon(DaymarkIcons.CloudOff,null,tint=Muted);Spacer(Modifier.width(12.dp))
-                Text(if(state.history.isEmpty()) "Customer records are waiting to sync." else "Showing customers saved on this device.",Modifier.weight(1f),color=Muted,style=MaterialTheme.typography.bodySmall)
-                TextButton(onClick=model::retryHistory) {Text("Refresh")}
+    }
+    editing?.let {customer ->CustomerDetailsSheet(customer,state.busy,state.message,{editing=null;model.dismissMessage()},
+        resolveConflict=if(customer.id in state.customerConflicts) {keep ->model.resolveCustomerConflict(customer.id,keep) {editing=null}} else null
+    ) {updated ->model.saveCustomer(updated) {editing=null}}}
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun CustomerDetailsSheet(customer:Customer,busy:Boolean,serverError:String?,dismiss:()->Unit,resolveConflict:((Boolean)->Unit)?=null,save:(Customer)->Unit) {
+    var name by rememberSaveable(customer.id) {mutableStateOf(customer.name)}
+    var mobile by rememberSaveable(customer.id) {mutableStateOf(customer.mobile)}
+    var notes by rememberSaveable(customer.id) {mutableStateOf(customer.notes)}
+    var prescription by remember(customer.id) {mutableStateOf(customer.latestPrescription ?: Prescription())}
+    var error by remember {mutableStateOf<String?>(null)}
+    ModalBottomSheet(onDismissRequest={if(!busy) dismiss()},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
+        LazyColumn(modifier=Modifier.imePadding().navigationBarsPadding().testTag("customer-profile-form"),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            item {Text("Customer details",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)}
+            item {Text("These details are used for future orders. Previous orders keep their original prescription.",style=MaterialTheme.typography.bodySmall,color=Muted)}
+            if(resolveConflict!=null) item {Column {
+                Text("The cloud profile changed or this phone belongs to another customer. Refresh Customers while online to compare versions. You can also correct the details below and Save to retry.",color=MaterialTheme.colorScheme.error)
+                TextButton(enabled=!busy,onClick={resolveConflict(false)}) {Text("Use cloud version")}
+                TextButton(enabled=!busy,onClick={resolveConflict(true)}) {Text("Retry my saved changes")}
             }}
+            item {OutlinedTextField(name,{name=it.take(120)},label={Text("Customer name")},singleLine=true,modifier=Modifier.fillMaxWidth())}
+            item {OutlinedTextField(mobile,{mobile=it.take(20)},label={Text("Mobile number")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Phone),modifier=Modifier.fillMaxWidth())}
+            item {Text("Latest prescription",fontWeight=FontWeight.SemiBold)}
+            item {EyePrescriptionEditor("OD · Right eye",prescription.distanceRight) {prescription=prescription.copy(distanceRight=it)}}
+            item {EyePrescriptionEditor("OS · Left eye",prescription.distanceLeft) {prescription=prescription.copy(distanceLeft=it)}}
+            item {Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(prescription.addRight.orEmpty(),{prescription=prescription.copy(addRight=it.ifBlank {null})},label={Text("ADD OD")},modifier=Modifier.weight(1f))
+                OutlinedTextField(prescription.addLeft.orEmpty(),{prescription=prescription.copy(addLeft=it.ifBlank {null})},label={Text("ADD OS")},modifier=Modifier.weight(1f))
+            }}
+            item {OutlinedTextField(prescription.pd.orEmpty(),{prescription=prescription.copy(pd=it.ifBlank {null})},label={Text("PD")},modifier=Modifier.fillMaxWidth())}
+            item {OutlinedTextField(notes,{notes=it.take(4000)},label={Text("Customer notes")},modifier=Modifier.fillMaxWidth())}
+            (error ?: serverError)?.let {message ->item {Text(message,color=MaterialTheme.colorScheme.error)}}
+            item {Button(enabled=!busy,onClick={try {
+                val normalized=PakistanPhone.normalize(mobile) ?: error("Enter a valid Pakistani mobile number.")
+                val updated=customer.copy(name=name.trim(),mobile=mobile.trim(),normalizedMobile=normalized,notes=notes.trim(),latestPrescription=prescription,
+                    previousMobiles=(customer.previousMobiles+customer.normalizedMobile).distinct().filter {it!=normalized})
+                OpticalRules.validateCustomer(updated);OpticalRules.validateEye(prescription.distanceRight);OpticalRules.validateEye(prescription.distanceLeft)
+                save(updated)
+            } catch(e:Exception) {error=e.message}},modifier=Modifier.fillMaxWidth()) {Text(if(busy) "Saving…" else "Save customer")}}
+            item {TextButton(onClick=dismiss,enabled=!busy,modifier=Modifier.fillMaxWidth()) {Text("Close")}}
         }
     }
 }
@@ -951,7 +999,8 @@ private fun storageLabel(bytes:Long):String=if(bytes<1024*1024) "${bytes/1024} K
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TodoEditor(existing:Todo?,busy:Boolean,serverError:String?,dismiss:()->Unit,save:(Todo)->Unit) {
+private fun TodoEditor(original:Todo?,busy:Boolean,serverError:String?,dismiss:()->Unit,repeatDraft:Todo?=null,save:(Todo)->Unit) {
+    val existing=original ?: repeatDraft
     val context=LocalContext.current
     val pickerTheme=if(MaterialTheme.colorScheme.background.red<.2f) android.R.style.Theme_Material_Dialog_Alert else android.R.style.Theme_Material_Light_Dialog_Alert
     var title by rememberSaveable(existing?.id) {mutableStateOf(existing?.title.orEmpty())}
@@ -983,10 +1032,11 @@ private fun TodoEditor(existing:Todo?,busy:Boolean,serverError:String?,dismiss:(
     ModalBottomSheet(onDismissRequest={if(!busy) dismiss()},containerColor=Paper) {
         LazyColumn(contentPadding=PaddingValues(start=24.dp,end=24.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(14.dp),modifier=Modifier.imePadding()) {
             item {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Text(if(existing==null) "New order" else "Edit order",Modifier.weight(1f),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
+                Text(if(original==null) "New order" else "Edit order",Modifier.weight(1f),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
                 IconButton(onClick=dismiss,enabled=!busy) {Icon(DaymarkIcons.Close,"Close task editor")}
             }}
             item {Text("Customer",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
+            if(repeatDraft!=null) item {Text("Review the copied prescription before saving. Previous orders keep their original prescription.",style=MaterialTheme.typography.bodySmall,color=Muted)}
             item {OutlinedTextField(title,{if(it.length<=Rules.MaxTitleLength) {title=it;error=null}},label={Text("Customer name")},singleLine=true,modifier=Modifier.fillMaxWidth())}
             item {OutlinedTextField(mobile,{mobile=it.take(20);error=null},label={Text("Mobile number")},placeholder={Text("0300 1234567")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Phone),modifier=Modifier.fillMaxWidth())}
             item {OutlinedTextField(orderNumber,{orderNumber=it.take(40).uppercase()},label={Text("Order number")},singleLine=true,modifier=Modifier.fillMaxWidth())}
@@ -1056,7 +1106,7 @@ private fun TodoEditor(existing:Todo?,busy:Boolean,serverError:String?,dismiss:(
                 val oldPayments=existing?.payments.orEmpty()
                 val payments=if(paidPaisa==oldPayments.sumOf {it.amountPaisa}) oldPayments else if(paidPaisa==0L) emptyList() else listOf(Payment(UUID.randomUUID().toString(),paidPaisa))
                 val todo=(existing ?: Todo(UUID.randomUUID().toString(),title)).copy(title=title.trim(),customerMobile=mobile.trim(),normalizedMobile=normalized,orderNumber=orderNumber.trim(),
-                    prescription=Prescription(distanceRight=rightEye,distanceLeft=leftEye,addRight=addRight.ifBlank {null},addLeft=addLeft.ifBlank {null},pd=pd.ifBlank {null}),
+                    prescription=(existing?.prescription ?: Prescription()).copy(distanceRight=rightEye,distanceLeft=leftEye,addRight=addRight.ifBlank {null},addLeft=addLeft.ifBlank {null},pd=pd.ifBlank {null}),
                     frame=(existing?.frame ?: FrameDetails()).copy(localImageUri=frameUri),amounts=OrderAmounts(framePaisa=framePaisa,lensPaisa=lensPaisa),payments=payments,
                     notes=notes.trim(),priority=priority,dueAt=due,reminderAt=at,updatedAt=now)
                 Rules.validate(todo,now,existing==null || at!=existing.reminderAt,existing==null || due!=existing.dueAt);save(todo)
