@@ -1,8 +1,0 @@
-<!-- Material icon, AndroidX 1.7.8. Apache-2.0; see NOTICE-ICONS. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="24dp" android:height="24dp" android:viewportWidth="24.0" android:viewportHeight="24.0">
-    <path android:fillColor="#FF000000" android:fillAlpha="1.0" android:fillType="nonZero" android:pathData="M 12.0,22.0 C 6.49,22.0,2.0,17.51,2.0,12.0 S 6.49,2.0,12.0,2.0 s 10.0,4.04,10.0,9.0 c 0.0,3.31,-2.69,6.0,-6.0,6.0 h -1.77 c -0.28,0.0,-0.5,0.22,-0.5,0.5 c 0.0,0.12,0.05,0.23,0.13,0.33 c 0.41,0.47,0.64,1.06,0.64,1.67 C 14.5,20.88,13.38,22.0,12.0,22.0 Z M 12.0,4.0 c -4.41,0.0,-8.0,3.59,-8.0,8.0 s 3.59,8.0,8.0,8.0 c 0.28,0.0,0.5,-0.22,0.5,-0.5 c 0.0,-0.16,-0.08,-0.28,-0.14,-0.35 c -0.41,-0.46,-0.63,-1.05,-0.63,-1.65 c 0.0,-1.38,1.12,-2.5,2.5,-2.5 H 16.0 c 2.21,0.0,4.0,-1.79,4.0,-4.0 C 20.0,7.14,16.41,4.0,12.0,4.0 Z" />
-    <path android:fillColor="#FF000000" android:fillAlpha="1.0" android:fillType="nonZero" android:pathData="M 6.5,11.5 m -1.5,0.0 a 1.5,1.5,0.0,1,1,3.0,0.0 a 1.5,1.5,0.0,1,1,-3.0,0.0" />
-    <path android:fillColor="#FF000000" android:fillAlpha="1.0" android:fillType="nonZero" android:pathData="M 9.5,7.5 m -1.5,0.0 a 1.5,1.5,0.0,1,1,3.0,0.0 a 1.5,1.5,0.0,1,1,-3.0,0.0" />
-    <path android:fillColor="#FF000000" android:fillAlpha="1.0" android:fillType="nonZero" android:pathData="M 14.5,7.5 m -1.5,0.0 a 1.5,1.5,0.0,1,1,3.0,0.0 a 1.5,1.5,0.0,1,1,-3.0,0.0" />
-    <path android:fillColor="#FF000000" android:fillAlpha="1.0" android:fillType="nonZero" android:pathData="M 17.5,11.5 m -1.5,0.0 a 1.5,1.5,0.0,1,1,3.0,0.0 a 1.5,1.5,0.0,1,1,-3.0,0.0" />
-</vector>

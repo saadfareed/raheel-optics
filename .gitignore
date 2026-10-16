@@ -1,0 +1,40 @@
+# Android / Gradle generated output and caches
+**/build/
+.gradle/
+.kotlin/
+.cxx/
+.externalNativeBuild/
+captures/
+
+# Machine-local SDK paths and credentials
+local.properties
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+
+# Local worktrees and editor state
+.worktrees/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
+# Local runtime/debug files
+*.log
+*.hprof

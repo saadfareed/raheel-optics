@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <bool name="light_system_bars">false</bool>
-    <color name="splash_background_color">#14131C</color>
-    <item name="themed_splash_logo" type="drawable">@drawable/raheel_optics_logo</item>
-</resources>

@@ -1,9 +1,0 @@
-<?xml version='1.0' encoding='UTF-8' ?>
-<testsuites tests="1" failures="0" errors="0" skipped="0" time="0.000" timestamp="2026-10-15T14:26:37" hostname="localhost">
-  <testsuite name="com.daymark.todo.OrderStatusStoreTest" tests="1" failures="0" errors="0" skipped="0" time="0.731" timestamp="2026-10-15T14:26:37" hostname="localhost">
-    <properties>
-      <property name="device" value="6pyl8llja66xzdam" />
-    </properties>
-    <testcase name="allFourStatusesRemainSearchableAndCountedAfterRestart" classname="com.daymark.todo.OrderStatusStoreTest" time="0.731" />
-  </testsuite>
-</testsuites>

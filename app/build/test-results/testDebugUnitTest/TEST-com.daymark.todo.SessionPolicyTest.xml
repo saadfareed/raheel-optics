@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.daymark.todo.SessionPolicyTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-15T14:26:12.208Z" hostname="saad-fareed-sadi" time="0.001">
-  <properties/>
-  <testcase name="closingTheAppDoesNotExpireSession" classname="com.daymark.todo.SessionPolicyTest" time="0.0"/>
-  <testcase name="inactivityExpiresAtBoundary" classname="com.daymark.todo.SessionPolicyTest" time="0.0"/>
-  <testcase name="neverExpireAndClockRollbackAreHandled" classname="com.daymark.todo.SessionPolicyTest" time="0.0"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

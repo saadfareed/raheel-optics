@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.daymark.todo.ExportCopyTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-15T14:26:08.999Z" hostname="saad-fareed-sadi" time="0.01">
-  <properties/>
-  <testcase name="cancellationDuringDestinationWriteStopsBeforeReadingAnotherChunk" classname="com.daymark.todo.ExportCopyTest" time="0.009"/>
-  <testcase name="copiesCompleteSnapshotIncludingFinalPartialChunk" classname="com.daymark.todo.ExportCopyTest" time="0.001"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.daymark.todo.CloudConfigTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-15T14:26:08.985Z" hostname="saad-fareed-sadi" time="0.002">
-  <properties/>
-  <testcase name="invalidOrCredentialBearingEndpointsRejected" classname="com.daymark.todo.CloudConfigTest" time="0.001"/>
-  <testcase name="secretAndServiceRoleKeysRejected" classname="com.daymark.todo.CloudConfigTest" time="0.001"/>
-  <testcase name="publicHttpsConfigurationAccepted" classname="com.daymark.todo.CloudConfigTest" time="0.0"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.daymark.todo.HttpCancellationTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-15T14:26:09.028Z" hostname="saad-fareed-sadi" time="3.147">
-  <properties/>
-  <testcase name="deadlineAlsoCancelsBlockingResponseBodyRead" classname="com.daymark.todo.HttpCancellationTest" time="1.013"/>
-  <testcase name="transportStillParsesHttpsJsonAndRejectsRedirects" classname="com.daymark.todo.HttpCancellationTest" time="0.137"/>
-  <testcase name="deadlineDuringHeaderStallCancelsSocketAndCompletesLocalCleanup" classname="com.daymark.todo.HttpCancellationTest" time="1.006"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>
