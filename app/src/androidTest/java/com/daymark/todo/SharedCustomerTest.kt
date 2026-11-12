@@ -20,6 +20,24 @@ class SharedCustomerTest {
         customerMobile=phone,normalizedMobile=PakistanPhone.normalize(phone)!!,
         prescription=Prescription(distanceRight=EyePrescription(sphere="-2.00")))
 
+    /** A fake server: API version 3, an empty feed, and caller-supplied customer/order endpoints. */
+    private class FakeCloud(val account:String,val upsert:(JsonElement?)->JsonElement,
+        val apply:(JsonElement?)->JsonElement={buildJsonObject {put("accepted",true);put("order",buildJsonObject {put("updatedAt",1);put("revision",1)})}}):BackendTransport {
+        val calls=mutableListOf<String>()
+        override suspend fun accountId()=account
+        override suspend fun request(path:String,method:String,body:JsonElement?,authenticated:Boolean):JsonElement {
+            calls+=path
+            return when(path.substringAfterLast('/')) {
+                "optical_orders_api_version" -> JsonPrimitive(3)
+                "optical_order_feed" -> buildJsonObject {put("rows",JsonArray(emptyList()));put("has_more",false)
+                    put("totals",buildJsonObject {put("active",0);put("completed",0);put("deleted",0);put("revision",0)})}
+                "upsert_optical_customer" -> upsert(body)
+                "apply_optical_order" -> apply(body)
+                else -> error("Unexpected request $path")
+            }
+        }
+    }
+
     @Test fun profileEditsAndRepeatOrderShareIdentityWithoutChangingPriorPrescription()=runBlocking {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val filename="shared-profile-${UUID.randomUUID()}.db"
@@ -72,24 +90,18 @@ class SharedCustomerTest {
             val store=TodoStore(db,account,false)
             store.save(order(),"create",null)
             val customer=store.customerDirectory(CustomerDirectoryQuery()).single().customer!!
-            val calls=mutableListOf<String>()
             var missing=true
-            val transport=object:BackendTransport {
-                override suspend fun accountId()=account
-                override suspend fun request(path:String,method:String,body:JsonElement?,authenticated:Boolean):JsonElement {
-                    calls+=path
-                    check(path=="/rest/v1/rpc/upsert_optical_customer")
-                    if(missing) throw ApiException(404,"Migration not installed")
-                    return buildJsonObject {put("accepted",true);put("customer",Json.encodeToJsonElement(customer))}
-                }
-            }
+            val transport=FakeCloud(account,{
+                if(missing) throw ApiException(404,"Migration not installed")
+                buildJsonObject {put("accepted",true);put("customer",Json.encodeToJsonElement(customer))}
+            })
             val sync=SupabaseSynchronizer(store,transport)
             try {sync.exchange();fail("Expected missing migration")} catch(_:ApiException) {}
             assertEquals(0L,db.get("SELECT count(*) FROM quarantined_changes") {it.getLong(0)!!})
             assertNotNull(db.getCrudBatch(1))
             missing=false
             assertTrue(sync.exchange())
-            assertEquals(2,calls.size)
+            assertEquals(2,transport.calls.count {it.endsWith("upsert_optical_customer")})
             assertEquals(1,store.customerDirectory(CustomerDirectoryQuery()).size)
             assertEquals(1L,db.get("SELECT count(*) FROM optical_customer_cache") {it.getLong(0)!!})
         } finally {db.close();context.deleteDatabase(filename)}
@@ -112,11 +124,9 @@ class SharedCustomerTest {
             profiles.retryCustomerChanges(original.copy(name="Reviewed local name"))
             assertEquals("Reviewed local name",store.customerDirectory(CustomerDirectoryQuery()).single().customer!!.name)
             assertEquals(0L,db.get("SELECT count(*) FROM optical_journal WHERE state='conflict'") {it.getLong(0)!!})
-            val transport=object:BackendTransport {
-                override suspend fun accountId()=account
-                override suspend fun request(path:String,method:String,body:JsonElement?,authenticated:Boolean):JsonElement=error("Superseded profile must not upload")
-            }
+            val transport=FakeCloud(account,{error("Superseded profile must not upload")})
             assertTrue(SupabaseSynchronizer(store,transport).exchange())
+            assertTrue("the order itself still uploads",transport.calls.any {it.endsWith("apply_optical_order")})
             val latest=db.get("SELECT payload FROM optical_journal WHERE state='queued' LIMIT 1") {Json.decodeFromString<OpticalOperation>(it.getString(0)!!)}
             profiles.recordResult(latest,false,1,"Changed again")
             profiles.resolveCustomerConflict(original.id,false)

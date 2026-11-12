@@ -7,15 +7,26 @@ enum class DeadlineFilter(val label: String) {
     Any("Any time"), Overdue("Overdue"), Today("Today"), Week("Next 7 days"), None("No promised date")
 }
 enum class TodoSort(val label: String) {
-    Deadline("Promised soonest"), LatestDeadline("Promised latest"), Latest("Recently updated"), Priority("Urgency"), Newest("Newest orders"), Oldest("Oldest orders")
+    Deadline("Promised soonest"), LatestDeadline("Promised latest"), Latest("Recently updated"), Priority("Urgency"), Newest("Newest orders"), Oldest("Oldest orders"), CustomerName("Customer A–Z"), Balance("Highest balance")
 }
-data class TodoQuery(val priority: String? = null, val deadline: DeadlineFilter = DeadlineFilter.Any, val sort: TodoSort = TodoSort.Newest, val search: String = "", val orderStatus: OrderStatus? = null)
-data class ListCursor(val value: Long, val id: String)
+/** Order list tabs, one per status; the list opens on ACTIVE. ALL is only used for exports and internal queries. */
+enum class OrderView(val label:String,val statuses:Set<OrderStatus>?) {
+    ACTIVE("Active",setOf(OrderStatus.ACTIVE)),
+    READY("Ready",setOf(OrderStatus.READY_FOR_PICKUP)),
+    COMPLETE("Completed",setOf(OrderStatus.COMPLETE)),
+    CANCEL("Cancelled",setOf(OrderStatus.CANCEL)),
+    ALL("All",null)
+}
+enum class PaymentFilter(val label:String) {ANY("Any payment"),UNPAID("Unpaid"),PARTIAL("Partially paid"),PAID("Paid")}
+data class TodoQuery(val priority: String? = null, val deadline: DeadlineFilter = DeadlineFilter.Any, val sort: TodoSort = TodoSort.Newest, val search: String = "", val orderStatus: OrderStatus? = null,
+    val view: OrderView = OrderView.ALL,
+    val payment:PaymentFilter=PaymentFilter.ANY,val orderedFrom:Long?=null,val orderedUntil:Long?=null,val promisedFrom:Long?=null,val promisedUntil:Long?=null)
+data class ListCursor(val value: Long, val id: String,val textValue:String?=null)
 data class TodoPage(val items: List<Todo>, val next: ListCursor?)
 data class HistoryPage(val items: List<HistoryEntry>, val next: ListCursor?)
 
 object ListRules {
-    const val PageSize = 25
+    const val PageSize = 10
     fun phoneSearch(value: String): String? {
         if(value.any {it.isLetter()}) return null
         val digits=value.filter {it.isDigit()}
@@ -37,6 +48,8 @@ object ListRules {
         TodoSort.Latest -> -todo.updatedAt
         TodoSort.Newest -> -todo.orderedAt
         TodoSort.Oldest -> todo.orderedAt
+        TodoSort.CustomerName -> 0L
+        TodoSort.Balance -> -(todo.amounts.totalPaisa-todo.payments.sumOf {it.amountPaisa}).coerceAtLeast(0)
         TodoSort.Priority -> when(todo.priority) { "High" -> 0L; "Medium" -> 1L; else -> 2L }
     }
 }

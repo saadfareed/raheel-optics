@@ -38,3 +38,6 @@ supabase/.branches/
 # Local runtime/debug files
 *.log
 *.hprof
+
+# Firebase config (from the Firebase console)
+**/google-services.json

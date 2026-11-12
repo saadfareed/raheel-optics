@@ -11,7 +11,8 @@ import java.nio.charset.CodingErrorAction
 import java.util.UUID
 
 /** A bounded preview. History and queued operations are never imported. */
-data class TaskImportPreview(val activeTasks: List<Todo>, val skippedNonActive: Int, val otherRecords: Int)
+enum class OpticalExportSelection(val label:String) {ACTIVE_ORDERS("Active orders"),CUSTOMERS("Customers"),BACKUP("Orders and customers backup")}
+data class TaskImportPreview(val activeTasks: List<Todo>, val skippedNonActive: Int, val otherRecords: Int,val customers:List<Customer> = emptyList())
 
 object TaskImport {
     private const val MAX_LINE = 256 * 1024
@@ -19,7 +20,7 @@ object TaskImport {
     private const val MAX_RECORDS = 100_000
     private const val MAX_TASKS = 500
     private val json = Json { ignoreUnknownKeys = true }
-    private val types = setOf("task", "history", "operation", "localState", "quarantinedChange", "queuedChange")
+    private val types = setOf("task", "history", "operation", "localState", "quarantinedChange", "queuedChange","customer","customerOperation")
 
     fun copyId(accountId: String, sourceId: String): String = UUID.nameUUIDFromBytes(
         "daymark-import-v1:$accountId:$sourceId".toByteArray(Charsets.UTF_8)).toString()
@@ -34,6 +35,8 @@ object TaskImport {
         var other = 0
         val tasks = ArrayList<Todo>()
         val seen = HashSet<String>()
+        val customers=ArrayList<Customer>()
+        val customerPhones=HashSet<String>()
         fun parseLine() {
             if(line.size()==0) return
             val decoded=Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
@@ -41,7 +44,8 @@ object TaskImport {
             line.reset()
             val row=json.parseToJsonElement(decoded) as? JsonObject ?: error("Invalid export record.")
             if(!header) {
-                check(row["format"]?.jsonPrimitive?.content=="daymark-export" && row["version"]?.jsonPrimitive?.content=="1") {"Unsupported Daymark export."}
+                val format=row["format"]?.jsonPrimitive?.content;val version=row["version"]?.jsonPrimitive?.content
+                check((format=="daymark-export" && version=="1") || (format=="raheel-optics-export" && version=="2")) {"Unsupported optical export."}
                 header=true
                 return
             }
@@ -49,7 +53,13 @@ object TaskImport {
             check(records<=MAX_RECORDS) {"Export has too many records."}
             val type=row["type"]?.jsonPrimitive?.content
             check(type in types && row["data"]!=null) {"Unexpected export record."}
-            if(type=="task") {
+            if(type=="customer") {
+                val customer=json.decodeFromJsonElement<Customer>(row.getValue("data"))
+                UUID.fromString(customer.id);OpticalRules.validateCustomer(customer)
+                check(customerPhones.add(customer.normalizedMobile)) {"Export contains duplicate customer phone numbers."}
+                check(customers.size<MAX_TASKS) {"Import supports at most 500 customers at a time."}
+                customers+=customer
+            } else if(type=="task") {
                 val todo=json.decodeFromJsonElement<Todo>(row.getValue("data"))
                 UUID.fromString(todo.id)
                 check(seen.add(todo.id)) {"Export contains a duplicate task."}
@@ -74,7 +84,7 @@ object TaskImport {
             }
         }
         parseLine()
-        check(header) {"This is not a Daymark export."}
-        return TaskImportPreview(tasks,skipped,other)
+        check(header) {"This is not a supported optical export."}
+        return TaskImportPreview(tasks,skipped,other,customers)
     }
 }

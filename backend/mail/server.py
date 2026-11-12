@@ -31,11 +31,11 @@ def report_error(where):
             return
         project = parsed.path.rsplit('/', 1)[-1]
         endpoint = f'https://{parsed.hostname}/api/{project}/store/'
-        event = json.dumps({'message': 'daymark-mail-webhook error at ' + where, 'level': 'error',
-                            'platform': 'python', 'logger': 'daymark.mail'}).encode()
+        event = json.dumps({'message': 'raheel-mail-webhook error at ' + where, 'level': 'error',
+                            'platform': 'python', 'logger': 'raheel.mail'}).encode()
         request = urllib.request.Request(endpoint, data=event, headers={
             'Content-Type': 'application/json',
-            'X-Sentry-Auth': f'Sentry sentry_version=7, sentry_client=daymark-mail/1, sentry_key={parsed.username}'})
+            'X-Sentry-Auth': f'Sentry sentry_version=7, sentry_client=raheel-mail/1, sentry_key={parsed.username}'})
         context = ssl.create_default_context()
         with urllib.request.urlopen(request, timeout=3, context=context):
             pass
@@ -61,7 +61,12 @@ def verify(body, headers, secret, now=None):
     return json.loads(body)
 
 
+def brand():
+    return os.environ.get('MAIL_BRAND_NAME', 'Raheel Optics')
+
+
 def messages(payload, public_url):
+    name = brand()
     parsed = urlsplit(public_url)
     if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.query or parsed.fragment:
         raise ValueError('AUTH_EMAIL_PAGE_URL must be your HTTPS page')
@@ -71,7 +76,8 @@ def messages(payload, public_url):
               'magiclink': 'Sign in to Daymark', 'email': 'Your Daymark sign-in link', 'invite': 'Your Daymark invitation',
               'email_change': 'Confirm your Daymark email change', 'reauthentication': 'Your Daymark security code'}
     notifications = {'password_changed': 'Your Daymark password was changed', 'email_changed': 'Your Daymark email was changed', 'phone_changed': 'Your Daymark phone number was changed', 'identity_linked': 'A sign-in identity was added to Daymark', 'identity_unlinked': 'A sign-in identity was removed from Daymark', 'mfa_factor_enrolled': 'A security method was added to Daymark', 'mfa_factor_unenrolled': 'A security method was removed from Daymark'}
-    titles.update({name + '_notification': subject for name, subject in notifications.items()})
+    titles.update({key + '_notification': subject for key, subject in notifications.items()})
+    titles = {key: subject.replace('Daymark', name) for key, subject in titles.items()}
     if action not in titles:
         raise ValueError('Unsupported email action')
     recipients = [(user['email'], data.get('token_hash'), data.get('token'))]
@@ -86,18 +92,18 @@ def messages(payload, public_url):
         if not recipient or '\n' in recipient or '\r' in recipient or '@' not in recipient:
             raise ValueError('Invalid recipient')
         if action.endswith('_notification'):
-            content = titles[action] + '. If you did not make this change, contact Daymark support immediately.'
+            content = titles[action] + '. If you did not make this change, contact ' + name + ' support immediately.'
         elif action == 'reauthentication':
             if not token:
                 raise ValueError('Missing security code')
-            content = 'Your Daymark security code is: ' + token
+            content = 'Your ' + name + ' security code is: ' + token
         else:
             if not token_hash:
                 raise ValueError('Missing token hash')
             # Fragment keeps credentials out of web-server logs and referrers.
             link = public_url + '#' + urlencode({'token_hash': token_hash, 'type': action})
             content = titles[action] + '\n\nOpen this link to continue:\n' + link
-        result.append((recipient, titles[action], content + '\n\nIf you did not request this, ignore this email.\nDaymark support: ' + os.environ.get('MAIL_REPLY_TO', 'pakistanbakeries@gmail.com')))
+        result.append((recipient, titles[action], content + '\n\nIf you did not request this, ignore this email.\n' + name + ' support: ' + (os.environ.get('MAIL_REPLY_TO') or os.environ.get('MAIL_FROM_ADDRESS', ''))))
     return result
 
 
@@ -127,7 +133,7 @@ def _deliver_connected(smtp,items,port,context):
         smtp.login(os.environ['SMTP_USER'], os.environ['SMTP_PASSWORD'])
         for recipient, subject, content in items:
             message = EmailMessage()
-            message['From'] = f"Daymark <{os.environ['MAIL_FROM_ADDRESS']}>"
+            message['From'] = f"{brand()} <{os.environ['MAIL_FROM_ADDRESS']}>"
             message['To'] = recipient
             message['Reply-To'] = os.environ.get('MAIL_REPLY_TO', os.environ['MAIL_FROM_ADDRESS'])
             message['Subject'] = subject

@@ -47,3 +47,12 @@ fun DaymarkLoader(modifier:Modifier=Modifier,color:Color=MaterialTheme.colorSche
         }
     }
 }
+
+/** Full-area loader: the shop logo centred inside the spinning ring, shown until a screen's data arrives. */
+@Composable
+fun LogoLoader(modifier:Modifier=Modifier,label:String="Loading",ring:androidx.compose.ui.unit.Dp=88.dp) {
+    androidx.compose.foundation.layout.Box(modifier,contentAlignment=androidx.compose.ui.Alignment.Center) {
+        DaymarkLoader(Modifier.size(ring),label=label)
+        BrandLogo(Modifier.size(ring*.62f))
+    }
+}

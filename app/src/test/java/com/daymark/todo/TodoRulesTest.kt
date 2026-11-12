@@ -19,7 +19,7 @@ class TodoRulesTest {
         assertEquals("deleted",deleted.status);assertEquals(original.title,deleted.title);assertEquals(original.notes,deleted.notes)
     }
     @Test fun durableOperationRoundTripKeepsPredecessorAndSnapshot() {
-        val op=Operation("operation",Todo("task","offline","notes"),"edit",3,"previous",400,"active")
+        val op=Operation("operation",Todo("task","offline","notes",updatedAt=100,orderedAt=100),"edit",3,"previous",400,"active")
         assertEquals(op,Json.decodeFromString<Operation>(Json.encodeToString(op)))
     }
     @Test fun titleLengthAndFutureTimesAreValidated() {

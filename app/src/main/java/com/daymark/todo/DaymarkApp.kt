@@ -33,7 +33,7 @@ class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
     private var workspaceKey: String? = null
     override fun onCreate() {
         super.onCreate()
-        if(BuildConfig.SENTRY_DSN.isNotBlank()) io.sentry.android.core.SentryAndroid.init(this) { it.dsn=BuildConfig.SENTRY_DSN }
+        CrashReporting.start(this)
         com.daymark.todo.ui.syncLaunchTheme(this)
         sessions=SessionStore(this)
         onboarding=com.daymark.todo.onboarding.OnboardingStore(this,sessions.sessionForRevocation()!=null)
@@ -97,7 +97,7 @@ class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
                 if(!destination.guestTaskTransferred(todo.id)) {pageComplete=false;break}
                 sessions.advanceGuestTransfer(todo.id)
             }
-            if(pageComplete && page.size<25) {
+            if(pageComplete && page.size<com.daymark.todo.core.ListRules.PageSize) {
                 destination.receiveGuestInbox(source.inboxItems())
                 db.disconnectAndClear(clearLocal=true)
                 sessions.finishGuestTransfer()

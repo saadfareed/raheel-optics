@@ -1,0 +1,10 @@
+# Baseline profile: pre-compile the app's own code and the Compose/coroutines/database code every launch uses,
+# so a cold start runs compiled code instead of interpreting it. Wildcards keep this valid across refactors.
+HSPLcom/daymark/todo/**->**(**)**
+Lcom/daymark/todo/**;
+HSPLandroidx/compose/**->**(**)**
+Landroidx/compose/**;
+HSPLandroidx/lifecycle/**->**(**)**
+HSPLkotlinx/coroutines/**->**(**)**
+HSPLkotlinx/serialization/**->**(**)**
+HSPLcom/powersync/**->**(**)**

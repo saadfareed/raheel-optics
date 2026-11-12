@@ -25,7 +25,7 @@ class SplashThemeTest {
 
     @Test fun taglineScreenUsesTheActiveLightAndDarkBackground() {
         val dark=mutableStateOf(false)
-        val lightBackground=Color(0xFFF7F7FC)
+        val lightBackground=Color(0xFFF5F9FC)
         val darkBackground=Color(0xFF14131C)
         compose.setContent {
             MaterialTheme(colorScheme=if(dark.value) darkColorScheme(background=darkBackground)
@@ -49,7 +49,7 @@ class SplashThemeTest {
 
     @Test fun nativeLaunchBackgroundHasMatchingDayAndNightResources() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
-        for((mode,expected) in listOf(Configuration.UI_MODE_NIGHT_NO to Color(0xFFF7F7FC),
+        for((mode,expected) in listOf(Configuration.UI_MODE_NIGHT_NO to Color(0xFFF5F9FC),
             Configuration.UI_MODE_NIGHT_YES to Color(0xFF14131C))) {
             val config=Configuration(context.resources.configuration)
             config.uiMode=(config.uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or mode

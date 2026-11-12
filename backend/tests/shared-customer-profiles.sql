@@ -12,8 +12,9 @@ do $$ declare op jsonb; result jsonb; replay jsonb; begin
  if not (result->>'accepted')::boolean or replay<>result then raise exception 'Create/replay failed'; end if;
  if (select count(*) from public.optical_customers)<>1 then raise exception 'Replay duplicated customer'; end if;
 end $$;
-insert into public.optical_orders(id,user_id,customer_id,order_number,status,ordered_at,updated_at,prescription)
-values('30000000-0000-0000-0000-000000000001','11111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-000000000001','PROFILE-1','active',100,100,'{"distanceRight":{"sphere":"-2.00"}}');
+select public.apply_optical_order(jsonb_build_object('id','40000000-0000-0000-0000-000000000001','action','order_create','baseRevision',0,'occurredAt',100,
+ 'order',jsonb_build_object('id','30000000-0000-0000-0000-000000000001','customerId','20000000-0000-0000-0000-000000000001','orderNumber','PROFILE-1',
+ 'status','ACTIVE','orderedAt',100,'prescription','{"distanceRight":{"sphere":"-2.00"}}'::jsonb)));
 do $$ declare result jsonb; begin
  result:=public.upsert_optical_customer(pg_temp.profile_op('10000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','Ayesha Khan','03011234567',1,'-3.00'));
  if not (result->>'accepted')::boolean or result->'customer'->>'name'<>'Ayesha Khan'

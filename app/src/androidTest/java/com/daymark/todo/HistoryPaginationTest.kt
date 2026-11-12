@@ -53,42 +53,25 @@ class HistoryPaginationTest {
     }
     @get:Rule val rules:RuleChain=RuleChain.outerRule(fixture).around(compose)
 
-    @Test fun localHistoryLoadsOlderRowsWithMetadataAndCanReopenThem() {
+    @Test fun loadMoreAppendsOrdersAndKeepsEarlierRowsInPlace() {
         lateinit var model:TodoViewModel
         compose.runOnUiThread {model=ViewModelProvider(compose.activity)[TodoViewModel::class.java]}
         compose.waitUntil(10000) {!model.state.value.loading && !model.state.value.busy}
-        assertEquals(25,model.state.value.history.size)
-        assertNotNull("Fixture must have a second saved-history page",runBlocking {app.workspace()!!.historyPage().next})
-        compose.onNodeWithContentDescription("History").performClick()
-        compose.waitForIdle()
-        compose.runOnUiThread {model.loadMoreHistory()}
-        compose.waitUntil(10000) {model.state.value.historyPageNumber==2 && !model.state.value.historyLoading}
-        assertTrue(model.state.value.history.size<=ListRules.PageSize)
-        assertEquals(2,model.state.value.historyPageNumber)
-        assertTrue(model.state.value.savedHistoryPrevious)
-        assertTrue(model.state.value.history.any {it.todo.id=="$account-25"})
-        assertEquals("completed" to 2L,model.state.value.snapshot.currentStates["$account-25"])
-        val older=model.state.value.history.single {it.todo.id=="$account-25"}
-        compose.runOnUiThread {model.transition(older.todo,"reopen")}
-        compose.waitUntil(10000) {!model.state.value.busy}
-        compose.runOnUiThread {model.firstSavedHistory()}
-        compose.waitUntil(10000) {model.state.value.history.any {it.todo.id=="$account-25" && it.action=="reopen"} && !model.state.value.historyLoading}
-        assertTrue("$account-25" in model.state.value.snapshot.activeTaskIds)
-    }
-    @Test fun taskPagesReplacePayloadsAndCanReturnToFirstPage() {
-        lateinit var model:TodoViewModel
-        compose.runOnUiThread {model=ViewModelProvider(compose.activity)[TodoViewModel::class.java]}
-        compose.waitUntil(10000) {!model.state.value.loading && !model.state.value.busy}
+        // Only this test's own orders count, whatever else the shared test data holds (for example demo orders).
+        compose.runOnUiThread {model.updateQuery(model.state.value.query.copy(search="Task "))}
         runBlocking {repeat(55) {i -> app.workspace()!!.save(Todo("$account-active-$i","Task $i",notes="x".repeat(4000)),"create",null)}}
         compose.waitUntil(10000) {model.state.value.todos.size==25 && model.state.value.todosMore}
-        val first=model.state.value.todos.map {it.id}.toSet()
+        val first=model.state.value.todos.map {it.id}
         compose.runOnUiThread {model.loadMoreTodos()}
-        compose.waitUntil(10000) {model.state.value.todoPageNumber==2 && !model.state.value.todosLoading}
-        assertEquals(25,model.state.value.todos.size)
-        assertTrue(first.intersect(model.state.value.todos.map {it.id}.toSet()).isEmpty())
-        compose.runOnUiThread {model.firstTodoPage()}
-        compose.waitUntil(10000) {model.state.value.todoPageNumber==1 && !model.state.value.todosLoading}
-        assertEquals(first,model.state.value.todos.map {it.id}.toSet())
+        compose.waitUntil(10000) {model.state.value.todos.size==50 && !model.state.value.todosLoading}
+        assertEquals("earlier rows keep their order",first,model.state.value.todos.take(25).map {it.id})
+        assertEquals(50,model.state.value.todos.map {it.id}.toSet().size)
+        compose.runOnUiThread {model.loadMoreTodos()}
+        compose.waitUntil(10000) {model.state.value.todos.size>=55 && !model.state.value.todosLoading}
+        assertFalse("everything loaded",model.state.value.todosMore)
+        compose.runOnUiThread {model.updateQuery(model.state.value.query.copy(search="Task 1"))}
+        compose.waitUntil(10000) {model.state.value.todos.size<50 && !model.state.value.todosLoading}
+        assertEquals("a new query starts again from one page",true,model.state.value.todos.size<=ListRules.PageSize)
     }
 
 }

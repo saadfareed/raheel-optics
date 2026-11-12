@@ -14,6 +14,7 @@ internal object DaymarkIcons {
     val Notes:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ic_ui_notes)
     val Add:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ic_ui_add)
     val Alarm:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ic_ui_alarm)
+    val Chat:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ic_ui_chat)
     val Check:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ic_ui_check)
     val CheckCircle:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ic_ui_check_circle)
     val ChevronRight:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ic_ui_chevron_right)

@@ -1,4 +1,6 @@
-set role authenticated;
+\set ON_ERROR_STOP on
+begin;
+set local role authenticated;
 select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111',false);
 
 do $$ begin
@@ -9,14 +11,20 @@ do $$ begin
   end if;
 end $$;
 
-insert into public.optical_customers(id,user_id,name,mobile,normalized_mobile,created_at,updated_at)
-values('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','11111111-1111-1111-1111-111111111111','Ayesha Khan','03001234567','+923001234567',1000,1000);
+select public.upsert_optical_customer(jsonb_build_object(
+ 'id','aaaaaaaa-1111-1111-1111-111111111111','action','customer_upsert','baseRevision',0,
+ 'payload',jsonb_build_object('type','customer_upsert','customer',jsonb_build_object(
+ 'id','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','name','Ayesha Khan',
+ 'mobile','03021234567','normalizedMobile','+923021234567','notes',''))));
 
-insert into public.optical_orders(id,user_id,customer_id,order_number,status,frame_paisa,lens_paisa,discount_paisa,ordered_at,updated_at)
-values('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','11111111-1111-1111-1111-111111111111','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','RO-0001','ready_for_pickup',50000,150000,10000,1000,1000);
-
-insert into public.optical_payments(id,user_id,order_id,amount_paisa,received_at,created_at)
-values('cccccccc-cccc-cccc-cccc-cccccccccccc','11111111-1111-1111-1111-111111111111','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',70000,1100,1100);
+do $$ declare r jsonb; begin
+  r:=public.apply_optical_order(jsonb_build_object('id','dddddddd-0000-0000-0000-000000000001','action','order_create','baseRevision',0,'occurredAt',1000,
+    'order',jsonb_build_object('id','bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb','customerId','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa','orderNumber','RO-0001',
+      'status','READY_FOR_PICKUP','orderedAt',1000,
+      'amounts',jsonb_build_object('framePaisa',50000,'lensPaisa',150000,'discountPaisa',10000),
+      'payments',jsonb_build_array(jsonb_build_object('id','cccccccc-cccc-cccc-cccc-cccccccccccc','amountPaisa',70000,'method','cash','receivedAt',1100)))));
+  if not (r->>'accepted')::boolean then raise exception 'Order create rejected: %',r; end if;
+end $$;
 
 do $$ declare total bigint; collected bigint; begin
   select total_paisa into total from public.optical_orders where order_number='RO-0001';
@@ -32,3 +40,4 @@ do $$ begin
 end $$;
 
 reset role;
+rollback;

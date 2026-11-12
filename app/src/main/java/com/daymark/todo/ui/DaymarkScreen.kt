@@ -15,7 +15,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -92,14 +95,16 @@ private val darkScheme=darkColorScheme(primary=Color(0xFF78C7F5),secondary=Color
 private val LocalThemeChoice=staticCompositionLocalOf {"System"}
 private val LocalSetTheme=staticCompositionLocalOf<(String)->Unit> {{}}
 private val LocalBrand=staticCompositionLocalOf {com.daymark.todo.branding.BrandAppearance(com.daymark.todo.branding.BrandConfig("Raheel Optics","Clear vision. Personal care."))}
-@Composable private fun BrandLogo(modifier:Modifier) {
-    Image(painterResource(R.drawable.raheel_optics_logo),LocalBrand.current.config.name+" logo",modifier)
+@Composable internal fun BrandLogo(modifier:Modifier) {
+    val dark=MaterialTheme.colorScheme.background.luminance()<.5f
+    val image=@Composable {m:Modifier -> Image(painterResource(R.drawable.raheel_optics_logo),LocalBrand.current.config.name+" logo",m)}
+    if(dark) Box(modifier.background(Color.White,CircleShape).padding(4.dp),contentAlignment=Alignment.Center) {image(Modifier.fillMaxSize())} else image(modifier)
 }
 private val codec=Json { ignoreUnknownKeys=true; encodeDefaults=true }
+private fun shortDate(time:Long):String=java.time.Instant.ofEpochMilli(time).atZone(java.time.ZoneId.of("Asia/Karachi")).format(DateTimeFormatter.ofPattern("d MMM yyyy",java.util.Locale.US))
 private fun date(time:Long?):String=time?.let {
     Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("MMM d · h:mm a"))
 } ?: "No promised date"
-@Composable private fun priorityColor(priority:String)=when(priority) { "High" -> Coral; "Low" -> Mint; else -> Amber }
 private fun remaining(time:Long,now:Long):String {
     val minutes=(time-now)/60000
     return when { time<now -> "Overdue"; minutes<1 -> "Due now"; minutes<60 -> "${minutes}m left"; minutes<1440 -> "${minutes/60}h left"; else -> "${minutes/1440}d left" }
@@ -130,6 +135,7 @@ fun DaymarkTheme(content:@Composable ()->Unit) {
 @Composable
 fun DaymarkScreen(target:String?,consumeTarget:()->Unit,model:TodoViewModel=viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
+    androidx.activity.compose.ReportDrawnWhen {!state.loading && (state.session==null || !state.todosLoading)}
     val context=LocalContext.current
     val app=context.applicationContext as DaymarkApp
     val appearance by app.branding.state.collectAsStateWithLifecycle()
@@ -154,6 +160,7 @@ fun DaymarkScreen(target:String?,consumeTarget:()->Unit,model:TodoViewModel=view
     var adding by rememberSaveable { mutableStateOf(false) }
     var repeatDraft by rememberSaveable(stateSaver=todoSaver) {mutableStateOf<Todo?>(null)}
     var deleting by remember { mutableStateOf<Todo?>(null) }
+    var details by rememberSaveable(stateSaver=todoSaver) {mutableStateOf<Todo?>(null)}
     var logout by remember { mutableStateOf(false) }
     var allowed by remember { mutableStateOf(app.reminders.allowed()) }
     val lifecycleOwner=LocalLifecycleOwner.current
@@ -176,7 +183,7 @@ fun DaymarkScreen(target:String?,consumeTarget:()->Unit,model:TodoViewModel=view
         if(state.session==null && !state.loading) { tab="Orders"; editor=null; adding=false; repeatDraft=null; deleting=null; logout=false }
     }
     LaunchedEffect(tab,state.session?.userId) { if(tab=="Customers" && state.session!=null) model.openCustomers() }
-    DisposableEffect(tab,state.session?.userId) {onDispose {if(tab=="Customers") model.closeHistory(); if(tab=="Analytics") model.closeAnalytics()}}
+    DisposableEffect(tab,state.session?.userId) {onDispose {if(tab=="Customers") model.closeCustomers(); if(tab=="Analytics") model.closeAnalytics()}}
     LaunchedEffect(target,state.loading) {
         if(target!=null && !state.loading && state.session!=null) {
             val todo=model.notificationTarget(target)
@@ -194,33 +201,37 @@ fun DaymarkScreen(target:String?,consumeTarget:()->Unit,model:TodoViewModel=view
                     if(tab=="Orders") BrandLogo(Modifier.size(40.dp))
                     Text(if(tab=="Orders") LocalBrand.current.config.name else tab,fontWeight=FontWeight.Bold)
                 }
-            },actions={IconButton(onClick={tab="Inbox"}) {
+            },actions={Tip("Notifications") {IconButton(onClick={tab="Inbox"}) {
                 BadgedBox(badge={if(state.snapshot.inbox.any { !it.read }) Badge(containerColor=Coral)}) {Icon(DaymarkIcons.Notifications,"Notifications")}
-            }},colors=TopAppBarDefaults.topAppBarColors(containerColor=Paper))},
+            }}},colors=TopAppBarDefaults.topAppBarColors(containerColor=Paper))},
             bottomBar={BottomNavigation(tab,{tab=it},{model.dismissMessage();adding=true;editor=null;repeatDraft=null},state.busy || state.loading)}
         ) { padding ->
             Column(Modifier.padding(padding).fillMaxSize()) {
                 state.message?.let {Message(it,model::dismissMessage)}
                 if(state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-                if(state.loading) Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) {DaymarkLoader()}
+                if(state.loading) LogoLoader(Modifier.fillMaxSize())
                 else when(tab) {
-                    "Orders" -> HomeScreen(state,model,{model.dismissMessage();editor=it},{model.transition(it,"complete")},{deleting=it})
-                    "Customers" -> CustomersScreen(state,model) {source ->repeatDraft=RepeatOrder.draft(source);editor=null;adding=true;model.dismissMessage()}
-                    "Analytics" -> AnalyticsScreen(state,model)
+                    "Orders" -> HomeScreen(state,model,{model.dismissMessage();details=it},{model.transition(it,"complete")},{deleting=it})
+                    "Customers" -> CustomersScreen(state,model,{source ->repeatDraft=RepeatOrder.draft(source);editor=null;adding=true;model.dismissMessage()},{model.dismissMessage();details=it})
+                    "Analytics" -> OpticalAnalyticsScreen(state,model)
                     "Inbox" -> InboxScreen(state.snapshot,allowed,notificationSettings,model) { id -> model.openTask(id) {todo -> editor=todo; if(todo!=null) tab="Orders"} }
                     else -> SettingsScreen(state,allowed,notificationSettings,model) {logout=true}
                 }
             }
         }
-        if(state.session!=null && (adding || editor!=null)) TodoEditor(editor,state.busy,state.message,{adding=false;editor=null;repeatDraft=null;model.dismissMessage()},repeatDraft) {todo ->
+        if(state.session!=null && (adding || editor!=null)) TodoEditor(editor,state.busy,state.message,{adding=false;editor=null;repeatDraft=null;model.dismissMessage()},repeatDraft,lookupCustomer={model.customerForMobile(it)}) {todo ->
             model.save(todo,editor) {adding=false;editor=null;repeatDraft=null}
         }
+        if(state.session!=null) details?.let {order ->OrderDetailScreen(order,state.busy,{details=null},
+            edit={details=null;editor=order},change={updated ->model.save(updated,order) {model.openOrder(order.id) {details=it}}},
+            complete={model.transition(order,"complete");details=null},cancel={details=null;deleting=order},
+            reorder={details=null;repeatDraft=RepeatOrder.draft(order);editor=null;adding=true})}
         deleting?.let { todo -> AlertDialog(onDismissRequest={deleting=null},title={Text("Cancel order?")},
             text={Text("The order will stay in your records with status Cancel.")},confirmButton={TextButton(onClick={model.transition(todo,"delete");deleting=null},enabled=!state.busy) {Text("Cancel order",color=MaterialTheme.colorScheme.error)}},
             dismissButton={TextButton(onClick={deleting=null}) {Text("Keep order")}}) }
-        if(logout) AlertDialog(onDismissRequest={logout=false},title={Text(if(state.session?.localOnly==true) "Leave guest mode?" else "Sign out?")},
+        if(logout) AlertDialog(onDismissRequest={logout=false},title={Text(if(state.session?.localOnly==true) "Leave guest mode?" else "Log out?")},
             text={Text(if(state.session?.localOnly==true) "Your guest orders will move to your account when you sign in." else if(state.snapshot.queuedCount>0) "Pending changes will resume after you sign in." else "Reminders pause until you sign in.")},
-            confirmButton={TextButton(onClick={logout=false;model.logout()},enabled=!state.busy) {Text(if(state.session?.localOnly==true) "Continue to sign in" else "Sign out")}},
+            confirmButton={TextButton(onClick={logout=false;model.logout()},enabled=!state.busy) {Text(if(state.session?.localOnly==true) "Continue to sign in" else "Log out")}},
             dismissButton={TextButton(onClick={logout=false}) {Text("Cancel")}})
     }
 }
@@ -251,9 +262,9 @@ private fun BottomNavigation(tab:String,onSelect:(String)->Unit,onAdd:()->Unit,d
 }
 
 @Composable private fun AddTaskButton(onAdd:()->Unit,disabled:Boolean) {
-    FilledIconButton(onClick=onAdd,enabled=!disabled,
+    Tip("Add order") {FilledIconButton(onClick=onAdd,enabled=!disabled,
         colors=IconButtonDefaults.filledIconButtonColors(containerColor=Violet,contentColor=MaterialTheme.colorScheme.onPrimary),
-        modifier=Modifier.size(56.dp),shape=CircleShape) {Icon(DaymarkIcons.Add,"Add order")}
+        modifier=Modifier.size(56.dp),shape=CircleShape) {Icon(DaymarkIcons.Add,"Add order")}}
 }
 
 @Composable private fun NavigationDestination(name:String,tab:String,onSelect:(String)->Unit,modifier:Modifier,compact:Boolean) {
@@ -283,7 +294,7 @@ private fun BottomNavigation(tab:String,onSelect:(String)->Unit,onAdd:()->Unit,d
     Surface(color=MaterialTheme.colorScheme.secondaryContainer,shape=RoundedCornerShape(16.dp),modifier=Modifier.padding(horizontal=20.dp,vertical=8.dp)) {
         Row(Modifier.padding(start=14.dp),verticalAlignment=Alignment.CenterVertically) {
             Text(text,Modifier.weight(1f).semantics {liveRegion=LiveRegionMode.Polite},style=MaterialTheme.typography.bodySmall)
-            IconButton(onClick=dismiss) {Icon(DaymarkIcons.Close,"Dismiss message")}
+            TipIconButton(DaymarkIcons.Close,"Dismiss message",dismiss)
         }
     }
 }
@@ -295,61 +306,46 @@ private fun BottomNavigation(tab:String,onSelect:(String)->Unit,onAdd:()->Unit,d
     }
 }
 
-@Composable
-private fun PageControls(number:Int,previous:Boolean,next:Boolean,loading:Boolean,first:()->Unit,back:()->Unit,forward:()->Unit) {
-    Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally) {
-        FlowRow(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick=back,enabled=previous && !loading) {Text("Previous")}
-            Text("Page $number",style=MaterialTheme.typography.labelMedium)
-            OutlinedButton(onClick=forward,enabled=next && !loading) {Text("Next")}
-        }
-        if(number>1) TextButton(onClick=first,enabled=!loading) {Text("First page")}
-    }
-}
-
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun HomeScreen(state:UiState,model:TodoViewModel,onEdit:(Todo)->Unit,onComplete:(Todo)->Unit,onDelete:(Todo)->Unit) {
     val list=rememberLazyListState()
     var filters by rememberSaveable { mutableStateOf(false) }
     var sortMenu by remember { mutableStateOf(false) }
+    var readyCandidate by remember {mutableStateOf<Todo?>(null)}
+    var pickupMessage by remember {mutableStateOf<Todo?>(null)}
+    var readyUndo by remember {mutableStateOf<Todo?>(null)}
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     val owner=LocalLifecycleOwner.current
     LaunchedEffect(owner) { owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
         while(true) {now=System.currentTimeMillis();delay(60000)}
     } }
-    LaunchedEffect(state.query,state.todoPageNumber,state.conflictPageNumber) {list.scrollToItem(0)}
-    LazyColumn(state=list,contentPadding=PaddingValues(start=20.dp,end=20.dp,top=8.dp,bottom=24.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+    LaunchedEffect(state.query,state.conflictPageNumber) {list.scrollToItem(0)}
+    LazyColumn(state=list,contentPadding=PaddingValues(start=Ui.Gutter,end=Ui.Gutter,top=Ui.Tight,bottom=24.dp),verticalArrangement=Arrangement.spacedBy(Ui.Item)) {
         item {Row(verticalAlignment=Alignment.CenterVertically) {
             Text("Your orders",Modifier.weight(1f),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
             Text(LocalDate.now().format(DateTimeFormatter.ofPattern("d MMM")),style=MaterialTheme.typography.labelMedium,color=Muted)
         }}
         state.syncProblem?.let {problem -> item {Text(problem,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)} }
-        item {OutlinedTextField(
-            value=state.query.search,
-            onValueChange={model.updateQuery(state.query.copy(search=it.take(40)))},
-            placeholder={Text("Search name, phone or order…",maxLines=1,overflow=TextOverflow.Ellipsis)},
-            shape=RoundedCornerShape(16.dp),
-            colors=OutlinedTextFieldDefaults.colors(unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant,unfocusedContainerColor=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.35f)),
-            leadingIcon={Icon(DaymarkIcons.Search,null)},
-            trailingIcon={if(state.query.search.isNotEmpty()) IconButton(onClick={model.updateQuery(state.query.copy(search=""))}) {Icon(DaymarkIcons.Close,"Clear search")}},
-            singleLine=true,
-            keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Text),
-            modifier=Modifier.fillMaxWidth()
-        )}
-        item {FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp),modifier=Modifier.fillMaxWidth()) {
-            FilterChip(selected=state.query.orderStatus==null,onClick={model.updateQuery(state.query.copy(orderStatus=null))},label={Text("All ${state.snapshot.orderStatusCounts.values.sum()}")})
-            OrderStatus.entries.forEach {status ->
-                FilterChip(selected=state.query.orderStatus==status,onClick={model.updateQuery(state.query.copy(orderStatus=status))},label={Text("${status.label} ${state.snapshot.orderStatusCounts[status] ?: 0}")})
+        readyUndo?.let {previous ->item {Row(verticalAlignment=Alignment.CenterVertically) {
+            Text("Marked Ready for pickup",Modifier.weight(1f))
+            TextButton(onClick={model.undoReady(previous);readyUndo=null}) {Text("Undo")}
+        }}}
+        item {DebouncedSearchField(state.query.search,"Search name, phone or order…",40,{model.updateQuery(state.query.copy(search=it))})}
+        item {Row(horizontalArrangement=Arrangement.spacedBy(Ui.Tight),modifier=Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+            val counts=state.snapshot.orderStatusCounts
+            listOf(OrderView.ALL,OrderView.ACTIVE,OrderView.READY,OrderView.COMPLETE,OrderView.CANCEL).forEach {view ->
+                val count=(view.statuses ?: OrderStatus.entries.toSet()).sumOf {counts[it] ?: 0}
+                FilterChip(selected=state.query.view==view,onClick={model.updateQuery(state.query.copy(view=view,orderStatus=null))},label={Text("${view.label} $count",maxLines=1)})
             }
         }}
         item {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-            Text(state.query.orderStatus?.label ?: "All orders",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
+            Text("${state.query.view.label} orders",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)
             TextButton(onClick={filters=true}) {Icon(DaymarkIcons.Tune,null,Modifier.size(18.dp));Spacer(Modifier.width(4.dp));Text("Filter")}
             Box {
             TextButton(onClick={sortMenu=true}) {Text("Sort");Icon(DaymarkIcons.ExpandMore,null)}
             DropdownMenu(expanded=sortMenu,onDismissRequest={sortMenu=false}) {
-                listOf(TodoSort.Newest,TodoSort.Oldest,TodoSort.Deadline,TodoSort.LatestDeadline,TodoSort.Latest).forEach {sort ->
+                listOf(TodoSort.Newest,TodoSort.Oldest,TodoSort.Deadline,TodoSort.LatestDeadline,TodoSort.CustomerName,TodoSort.Balance,TodoSort.Latest).forEach {sort ->
                     DropdownMenuItem(text={Text(sort.label)},onClick={model.updateQuery(state.query.copy(sort=sort));sortMenu=false})
                 }
             }
@@ -372,65 +368,40 @@ private fun HomeScreen(state:UiState,model:TodoViewModel,onEdit:(Todo)->Unit,onC
         }
         if(state.todos.isEmpty() && !state.todosLoading) item {
             Column(horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.fillMaxWidth()) {
-                val filtered=state.query.orderStatus!=null || state.query.deadline!=DeadlineFilter.Any || state.query.search.isNotBlank()
-                EmptyState("No orders",if(filtered) "No customer orders match your search or filters." else "Tap + to add the first optical order.")
-                if(filtered) FilledTonalButton(onClick={model.updateQuery(state.query.copy(priority=null,deadline=DeadlineFilter.Any,orderStatus=null,search=""))}) {
+                val filtered=state.query.deadline!=DeadlineFilter.Any || state.query.search.isNotBlank() || state.query.payment!=PaymentFilter.ANY || state.query.orderedFrom!=null || state.query.orderedUntil!=null || state.query.promisedFrom!=null || state.query.promisedUntil!=null
+                EmptyState("No orders",if(filtered) "No ${state.query.view.label.lowercase()} orders match your search or filters." else when(state.query.view) {OrderView.ACTIVE -> "No active orders. Tap + to add an optical order.";OrderView.READY -> "Orders marked ready for pickup will appear here.";OrderView.COMPLETE -> "Completed orders will appear here.";else -> "Cancelled orders will appear here."})
+                if(filtered) FilledTonalButton(onClick={model.updateQuery(TodoQuery(sort=state.query.sort,view=state.query.view))}) {
                     Icon(DaymarkIcons.FilterAltOff,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text("Remove filters")
                 }
             }
         }
-        items(state.todos,key={it.id}) {todo -> TodoCard(todo,now,state.busy,onEdit,onComplete,onDelete,{ready ->
-            model.save(ready.copy(orderStatus=OrderStatus.READY_FOR_PICKUP,updatedAt=System.currentTimeMillis()),ready) {}
+        items(state.todos,key={it.id}) {todo -> TodoCard(todo,now,state.busy,onEdit,onComplete,onDelete,{swiped ->
+            if(swiped.orderStatus==OrderStatus.READY_FOR_PICKUP) pickupMessage=swiped else readyCandidate=swiped
         },Modifier.animateItem())}
-        if(state.todoPageNumber>1 || state.todosMore) item {
-            PageControls(state.todoPageNumber,state.todoPrevious,state.todosMore,state.todosLoading,model::firstTodoPage,model::previousTodoPage,model::loadMoreTodos)
-        }
-        if(state.todosLoading) item {Box(Modifier.fillMaxWidth().padding(12.dp),contentAlignment=Alignment.Center) {DaymarkLoader(Modifier.size(22.dp),label="Loading more orders")}}
+        item {LoadMoreFooter(state.todosMore,state.todosLoading && state.todos.isNotEmpty(),"Load more orders",model::loadMoreTodos)}
+        if(state.todosLoading && state.todos.isEmpty()) item {LogoLoader(Modifier.fillMaxWidth().padding(vertical=48.dp),"Loading orders")}
     }
     if(filters) FilterSheet(state.query,{filters=false}) {model.updateQuery(it);filters=false}
-}
-
-@Composable
-private fun ProgressSummary(snapshot:Snapshot,online:Boolean,localOnly:Boolean,open:(Todo)->Unit,filter:(DeadlineFilter)->Unit) {
-    Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-        Row(verticalAlignment=Alignment.CenterVertically) {
-            Text(LocalDate.now().format(DateTimeFormatter.ofPattern("EEE, d MMM")),Modifier.weight(1f),style=MaterialTheme.typography.titleMedium)
-            Text(when {snapshot.queuedCount>0 -> "${snapshot.queuedCount} pending";localOnly -> "On this device";online -> "Synced";else -> "Offline"},style=MaterialTheme.typography.labelSmall,color=Muted)
-        }
-        Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            SummaryMetric("Open",snapshot.totals.active,MaterialTheme.colorScheme.surfaceVariant,MaterialTheme.colorScheme.onSurfaceVariant,Modifier.weight(1f)) {filter(DeadlineFilter.Any)}
-            SummaryMetric("Today",snapshot.dueTodayCount,MaterialTheme.colorScheme.surfaceVariant,MaterialTheme.colorScheme.onSurfaceVariant,Modifier.weight(1f)) {filter(DeadlineFilter.Today)}
-            SummaryMetric("Overdue",snapshot.overdueCount,MaterialTheme.colorScheme.surfaceVariant,MaterialTheme.colorScheme.onSurfaceVariant,Modifier.weight(1f)) {filter(DeadlineFilter.Overdue)}
-        }
-    }
-}
-
-@Composable
-private fun SummaryMetric(label:String,count:Int,background:Color,foreground:Color,modifier:Modifier=Modifier,horizontal:Boolean=false,onClick:()->Unit) {
-    Surface(onClick=onClick,modifier=modifier,shape=RoundedCornerShape(18.dp),color=background) {
-        if(horizontal) Row(Modifier.padding(horizontal=16.dp,vertical=12.dp),verticalAlignment=Alignment.CenterVertically) {
-            Text(label,Modifier.weight(1f),color=foreground,style=MaterialTheme.typography.labelLarge)
-            Text(count.toString(),color=foreground,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleLarge)
-        } else Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-            Text(count.toString(),color=foreground,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.headlineSmall)
-            Text(label,color=foreground,style=MaterialTheme.typography.labelMedium)
-        }
-    }
+    readyCandidate?.let {order ->AlertDialog(onDismissRequest={readyCandidate=null},title={Text("Ready for pickup?")},text={Text("Confirm that ${order.title}'s glasses are ready.")},
+        confirmButton={TextButton(enabled=!state.busy,onClick={model.save(order.copy(orderStatus=OrderStatus.READY_FOR_PICKUP,updatedAt=System.currentTimeMillis()),order) {readyUndo=order};readyCandidate=null}) {Text("Mark ready")}},
+        dismissButton={TextButton(onClick={readyCandidate=null}) {Text("Keep active")}})}
+    pickupMessage?.let {order ->PickupMessageDialog(order) {pickupMessage=null}}
 }
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun TodoCard(todo:Todo,now:Long,busy:Boolean,onEdit:(Todo)->Unit,onComplete:(Todo)->Unit,onDelete:(Todo)->Unit,onReady:(Todo)->Unit,modifier:Modifier=Modifier) {
     val context=LocalContext.current
-    var expanded by rememberSaveable(todo.id) { mutableStateOf(false) }
+    val expanded=false
     val tint=when(todo.orderStatus) {OrderStatus.ACTIVE -> Violet;OrderStatus.READY_FOR_PICKUP -> Amber;OrderStatus.COMPLETE -> Mint;OrderStatus.CANCEL -> Muted}
     val canReady=todo.orderStatus.canMarkReady
+    val canMessage=todo.orderStatus==OrderStatus.READY_FOR_PICKUP
     val swipe=rememberSwipeToDismissBoxState(confirmValueChange={target ->
-        if(target==SwipeToDismissBoxValue.EndToStart || target==SwipeToDismissBoxValue.StartToEnd) {if(canReady && !busy) onReady(todo);false} else true
+        if(target==SwipeToDismissBoxValue.EndToStart || target==SwipeToDismissBoxValue.StartToEnd) {if((canReady || canMessage) && !busy) onReady(todo);false} else true
     })
-    SwipeToDismissBox(state=swipe,enableDismissFromStartToEnd=canReady,enableDismissFromEndToStart=false,backgroundContent={
-        Box(Modifier.fillMaxSize().background(Mint,RoundedCornerShape(22.dp)).padding(horizontal=24.dp),contentAlignment=Alignment.CenterStart) {Text("Mark ready",color=Color.White,fontWeight=FontWeight.Bold)}
-    }) {Card(onClick={expanded=!expanded},modifier=modifier.fillMaxWidth().animateContentSize(),shape=RoundedCornerShape(22.dp),
+    SwipeToDismissBox(state=swipe,enableDismissFromStartToEnd=canReady || canMessage,enableDismissFromEndToStart=false,backgroundContent={
+        Box(Modifier.fillMaxSize().background(if(canMessage) Ui.WhatsApp else Mint,RoundedCornerShape(22.dp)).padding(horizontal=24.dp),contentAlignment=Alignment.CenterStart) {Text(if(canMessage) "WhatsApp customer" else "Mark ready",color=Color.White,fontWeight=FontWeight.Bold)}
+    }) {Card(onClick={onEdit(todo)},modifier=modifier.fillMaxWidth().animateContentSize(),shape=RoundedCornerShape(22.dp),
         colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface),elevation=CardDefaults.cardElevation(defaultElevation=1.dp),border=androidx.compose.foundation.BorderStroke(1.dp,tint.copy(alpha=.16f))) {
         Column(Modifier.drawBehind {drawRect(tint,Offset.Zero,Size(3.dp.toPx(),size.height))}.padding(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment=Alignment.Top,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -443,7 +414,7 @@ private fun TodoCard(todo:Todo,now:Long,busy:Boolean,onEdit:(Todo)->Unit,onCompl
                         if(todo.notes.isNotBlank()) Icon(DaymarkIcons.Notes,null,Modifier.size(15.dp),tint=Muted)
                     }
                 }
-                if(!todo.orderStatus.isTerminal) IconButton(onClick={onEdit(todo)},enabled=!busy,modifier=Modifier.size(48.dp)) {Icon(DaymarkIcons.Edit,"Edit ${todo.title}",tint=Muted)}
+                Icon(DaymarkIcons.ChevronRight,"View order",tint=Muted)
             }
             if(todo.dueAt!=null && !todo.orderStatus.isTerminal) {
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
@@ -475,7 +446,7 @@ private fun TodoCard(todo:Todo,now:Long,busy:Boolean,onEdit:(Todo)->Unit,onCompl
                         }) {Text("WhatsApp")}
                     }
                     else if(canReady) Text("Swipe right when ready",Modifier.weight(1f),style=MaterialTheme.typography.labelSmall,color=Muted)
-                    if(!todo.orderStatus.isTerminal) TextButton(onClick={onDelete(todo)},enabled=!busy) {Text(OrderStatus.CANCEL.label,color=MaterialTheme.colorScheme.error)}
+                    if(todo.orderStatus==OrderStatus.ACTIVE) TextButton(onClick={onDelete(todo)},enabled=!busy) {Text(OrderStatus.CANCEL.label,color=MaterialTheme.colorScheme.error)}
                 }
             }
         }
@@ -485,77 +456,130 @@ private fun TodoCard(todo:Todo,now:Long,busy:Boolean,onEdit:(Todo)->Unit,onCompl
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun FilterSheet(query:TodoQuery,dismiss:()->Unit,apply:(TodoQuery)->Unit) {
-    var status by rememberSaveable {mutableStateOf(query.orderStatus)}
     var deadline by rememberSaveable {mutableStateOf(query.deadline)}
+    var payment by rememberSaveable {mutableStateOf(query.payment)}
+    var orderedFrom by remember {mutableStateOf(query.orderedFrom)}
+    var orderedUntil by remember {mutableStateOf(query.orderedUntil)}
+    var promisedFrom by remember {mutableStateOf(query.promisedFrom)}
+    var promisedUntil by remember {mutableStateOf(query.promisedUntil)}
+    var error by remember {mutableStateOf<String?>(null)}
     ModalBottomSheet(onDismissRequest=dismiss,containerColor=MaterialTheme.colorScheme.surface,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        LazyColumn(modifier=Modifier.navigationBarsPadding(),contentPadding=PaddingValues(24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-            item {Row(verticalAlignment=Alignment.CenterVertically) {Text("Order filters",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));TextButton(onClick={status=null;deadline=DeadlineFilter.Any}) {Text("Reset")}}}
-            item {Text("Order status",fontWeight=FontWeight.SemiBold);FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                (listOf<OrderStatus?>(null)+OrderStatus.entries).forEach {value -> FilterChip(selected=status==value,onClick={status=value},label={Text(value?.label ?: "All")})}
-            }}
+        LazyColumn(modifier=Modifier.navigationBarsPadding(),contentPadding=PaddingValues(Ui.Gutter),verticalArrangement=Arrangement.spacedBy(Ui.Item)) {
+            item {Row(verticalAlignment=Alignment.CenterVertically) {Text("Order filters",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,modifier=Modifier.weight(1f));TextButton(onClick={deadline=DeadlineFilter.Any;payment=PaymentFilter.ANY;orderedFrom=null;orderedUntil=null;promisedFrom=null;promisedUntil=null}) {Text("Reset")}}}
             item {Text("Promised date",fontWeight=FontWeight.SemiBold);FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 DeadlineFilter.entries.forEach {value -> FilterChip(selected=deadline==value,onClick={deadline=value},label={Text(value.label)})}
             }}
-            item {Button(onClick={apply(query.copy(priority=null,deadline=deadline,orderStatus=status))},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text("Apply filters")}}
+            item {Text("Payment");FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {PaymentFilter.entries.forEach {value ->FilterChip(selected=payment==value,onClick={payment=value},label={Text(value.label)})}}}
+            item {OrderDateRange("Order date",orderedFrom,orderedUntil) {a,b ->orderedFrom=a;orderedUntil=b}}
+            item {OrderDateRange("Promised date range",promisedFrom,promisedUntil) {a,b ->promisedFrom=a;promisedUntil=b}}
+            error?.let {item {Text(it,color=MaterialTheme.colorScheme.error)}}
+            item {Button(onClick={if((orderedFrom!=null && orderedUntil!=null && orderedFrom!!>=orderedUntil!!) || (promisedFrom!=null && promisedUntil!=null && promisedFrom!!>=promisedUntil!!)) error="Choose an end date on or after the start date." else apply(query.copy(priority=null,deadline=deadline,payment=payment,orderedFrom=orderedFrom,orderedUntil=orderedUntil,promisedFrom=promisedFrom,promisedUntil=promisedUntil))},modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text("Apply filters")}}
         }
     }
 }
 
 @Composable
-private fun CustomersScreen(state:UiState,model:TodoViewModel,newOrder:(Todo)->Unit) {
+private fun CustomersScreen(state:UiState,model:TodoViewModel,newOrder:(Todo)->Unit,openOrder:(Todo)->Unit) {
     val query=state.customerQuery
+    val context=LocalContext.current
+    val scope=rememberCoroutineScope()
     var sortMenu by remember {mutableStateOf(false)}
     var editing by remember {mutableStateOf<Customer?>(null)}
+    var viewing by remember {mutableStateOf<CustomerDirectoryRow?>(null)}
     val list=rememberLazyListState()
-    LaunchedEffect(query) {list.scrollToItem(0)}
-    LazyColumn(state=list,contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-        item {OutlinedTextField(value=query.search,onValueChange={model.updateCustomers(query.copy(search=it.take(80),page=1))},
-            placeholder={Text("Search name or mobile")},leadingIcon={Icon(DaymarkIcons.Search,null)},
-            trailingIcon={if(query.search.isNotEmpty()) IconButton(onClick={model.updateCustomers(query.copy(search="",page=1))}) {Icon(DaymarkIcons.Close,"Clear search")}},
-            singleLine=true,shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth())}
-        item {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-            FilterChip(selected=query.outstandingOnly,onClick={model.updateCustomers(query.copy(outstandingOnly=!query.outstandingOnly,page=1))},label={Text("Balance due")})
-            Spacer(Modifier.weight(1f))
+    LaunchedEffect(query.search,query.sort,query.outstandingOnly,query.returning) {list.scrollToItem(0)}
+    fun whatsApp(row:CustomerDirectoryRow) {scope.launch {
+        val customer=row.latestOrder
+        try {
+            val orders=model.ordersForCustomer(row)
+            val shop=ShopPreferences.load(context)
+            val mobile=customer.customerMobile.ifBlank {customer.normalizedMobile}
+            // The picture lists orders that still owe money or are ready for pickup; settled history stays out of the statement.
+            val statement=orders.filter {it.orderStatus==OrderStatus.READY_FOR_PICKUP || (it.orderStatus!=OrderStatus.CANCEL && it.amounts.totalPaisa>it.payments.sumOf {p ->p.amountPaisa})}
+            WhatsAppShare.send(context,mobile,shop.duesMessage(customer.title,orders),InvoiceBuilder.build(shop,customer.title,mobile,statement.ifEmpty {orders}))
+        } catch(e:CancellationException) {throw e}
+        catch(e:Exception) {android.widget.Toast.makeText(context,e.message ?: "Couldn't open WhatsApp.",android.widget.Toast.LENGTH_LONG).show()}
+    }}
+    LazyColumn(state=list,contentPadding=PaddingValues(start=Ui.Gutter,end=Ui.Gutter,top=Ui.Tight,bottom=24.dp),verticalArrangement=Arrangement.spacedBy(Ui.Item)) {
+        item {DebouncedSearchField(query.search,"Search name or mobile",80,{model.updateCustomers(query.copy(search=it,page=1,loaded=1))})}
+        item {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(Ui.Tight)) {
+            Text("Sorted by ${query.sort.label.lowercase()}",Modifier.weight(1f),style=MaterialTheme.typography.labelMedium,color=Muted)
             Box {
-                TextButton(onClick={sortMenu=true}) {Text(query.sort.label);Icon(DaymarkIcons.ExpandMore,null)}
+                TipIconButton(DaymarkIcons.Tune,"Sort customers",{sortMenu=true})
                 DropdownMenu(expanded=sortMenu,onDismissRequest={sortMenu=false}) {
-                    CustomerSort.entries.forEach {sort ->DropdownMenuItem(text={Text(sort.label)},onClick={model.updateCustomers(query.copy(sort=sort,page=1));sortMenu=false})}
+                    CustomerSort.entries.forEach {sort ->DropdownMenuItem(text={Text(sort.label,fontWeight=if(sort==query.sort) FontWeight.Bold else null)},onClick={model.updateCustomers(query.copy(sort=sort,page=1,loaded=1));sortMenu=false})}
                 }
             }
         }}
-        item {Text("Tap a customer to start a new order.",style=MaterialTheme.typography.bodySmall,color=Muted)}
-        if(state.customers.isEmpty()) item {
-            EmptyState("No customers found",if(query.search.isNotBlank() || query.outstandingOnly) "Try another search or remove the balance filter." else "Your first saved order adds a customer here.",DaymarkIcons.Person)
+        if(!state.customersLoaded) item {LogoLoader(Modifier.fillMaxWidth().padding(vertical=48.dp),"Loading customers")}
+        else if(state.customers.isEmpty()) item {
+            EmptyState("No customers found",if(query.search.isNotBlank()) "Try another name or mobile number." else "Your first saved order adds a customer here.",DaymarkIcons.Person)
         }
         items(state.customers,key={it.customer?.id ?: it.latestOrder.normalizedMobile}) {row ->
             val customer=row.latestOrder
-            Card(onClick={newOrder(customer)},modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(18.dp),colors=CardDefaults.cardColors(containerColor=MaterialTheme.colorScheme.surface)) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                        Box(Modifier.size(42.dp).background(Violet.copy(alpha=.12f),CircleShape),contentAlignment=Alignment.Center) {Icon(DaymarkIcons.Person,null,tint=Violet)}
-                        Column(Modifier.weight(1f)) {
-                            Text(customer.title,fontWeight=FontWeight.SemiBold)
-                            Text(customer.customerMobile,style=MaterialTheme.typography.bodySmall,color=Muted)
-                        }
-                        Icon(DaymarkIcons.Add,"New order")
+            val conflict=row.customer?.id in state.customerConflicts
+            AppCard(onClick={model.dismissMessage();viewing=row}) {
+                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(Ui.Item)) {
+                    Box(Modifier.size(44.dp).background(Violet.copy(alpha=.12f),CircleShape),contentAlignment=Alignment.Center) {
+                        Text(customer.title.trim().take(1).uppercase().ifBlank {"?"},color=Violet,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.titleMedium)
                     }
-                    Text(if(row.orderCount==0) "No orders stored on this device" else "${row.orderCount} order(s) · Last ${date(row.lastOrderAt)}",style=MaterialTheme.typography.labelSmall,color=Muted)
-                    if(row.balancePaisa>0) Text("Balance PKR ${java.math.BigDecimal.valueOf(row.balancePaisa,2).toPlainString()}",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.error)
-                    row.customer?.let {customer -> TextButton(onClick={model.dismissMessage();editing=customer}) {Text("Customer details")}}
-                    if(row.customer?.id in state.customerConflicts) Text("Customer changes need review",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.labelMedium)
+                    Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                        Text(customer.title,fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.titleMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
+                        Text(customer.customerMobile,style=MaterialTheme.typography.bodyMedium,color=Muted,maxLines=1)
+                        Text(if(row.orderCount==0) "No orders yet" else "${row.orderCount} order${if(row.orderCount==1) "" else "s"} · ${shortDate(row.lastOrderAt)}",style=MaterialTheme.typography.labelSmall,color=Muted,maxLines=1,overflow=TextOverflow.Ellipsis)
+                    }
+                    Column(horizontalAlignment=Alignment.End,verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                        Text("Balance",style=MaterialTheme.typography.labelSmall,color=Muted)
+                        Text(if(row.balancePaisa>0) Money.pkr(row.balancePaisa) else "Clear",style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Bold,color=if(row.balancePaisa>0) Coral else Mint)
+                    }
+                    TipIconButton(DaymarkIcons.Chat,"Send dues on WhatsApp",{whatsApp(row)},Modifier.size(48.dp).testTag("customer-whatsapp"),tint=Ui.WhatsApp)
                 }
+                if(conflict) Text("Customer changes need review",color=Coral,style=MaterialTheme.typography.labelMedium)
             }
         }
-        if(query.page>1 || state.customersMore) item {
-            PageControls(query.page,query.page>1,state.customersMore,state.busy,
-                {model.updateCustomers(query.copy(page=1))},
-                {model.updateCustomers(query.copy(page=(query.page-1).coerceAtLeast(1)))},
-                {model.updateCustomers(query.copy(page=query.page+1))})
-        }
+        item {LoadMoreFooter(state.customersMore,state.busy,"Load more customers") {model.updateCustomers(query.copy(loaded=query.loaded+1))}}
     }
+    viewing?.let {row ->CustomerOrdersDialog(row,model,{viewing=null},openOrder={viewing=null;openOrder(it)},newOrder={viewing=null;newOrder(row.latestOrder)},
+        edit={row.customer?.let {c ->viewing=null;model.dismissMessage();editing=c}},whatsApp={whatsApp(row)})}
     editing?.let {customer ->CustomerDetailsSheet(customer,state.busy,state.message,{editing=null;model.dismissMessage()},
         resolveConflict=if(customer.id in state.customerConflicts) {keep ->model.resolveCustomerConflict(customer.id,keep) {editing=null}} else null
     ) {updated ->model.saveCustomer(updated) {editing=null}}}
+}
+
+@Composable
+private fun CustomerOrdersDialog(row:CustomerDirectoryRow,model:TodoViewModel,dismiss:()->Unit,openOrder:(Todo)->Unit,newOrder:()->Unit,edit:()->Unit,whatsApp:()->Unit) {
+    val customer=row.latestOrder
+    val orders by produceState<List<Todo>?>(null,row.latestOrder.id,row.orderCount) {value=runCatching {model.ordersForCustomer(row)}.getOrDefault(emptyList())}
+    AppDialog(customer.title,dismiss,"New order",newOrder) {
+        Column(Modifier.heightIn(max=420.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(Ui.Item)) {
+            KeyValueRow("Mobile",customer.customerMobile)
+            KeyValueRow("Orders",row.orderCount.toString())
+            KeyValueRow("Balance due",if(row.balancePaisa>0) "${Money.pkr(row.balancePaisa)}" else "Clear",emphasis=if(row.balancePaisa>0) Coral else Mint)
+            Row(horizontalArrangement=Arrangement.spacedBy(Ui.Tight)) {
+                OutlinedButton(onClick=whatsApp,shape=Ui.Field,contentPadding=PaddingValues(horizontal=8.dp),modifier=Modifier.weight(1f)) {Icon(DaymarkIcons.Chat,null,Modifier.size(18.dp),tint=Ui.WhatsApp);Spacer(Modifier.width(6.dp));Text("WhatsApp",maxLines=1,softWrap=false)}
+                if(row.customer!=null) OutlinedButton(onClick=edit,shape=Ui.Field,contentPadding=PaddingValues(horizontal=8.dp),modifier=Modifier.weight(1f)) {Text("Edit details",maxLines=1,softWrap=false)}
+            }
+            SectionLabel("Orders")
+            when {
+                orders==null -> LogoLoader(Modifier.fillMaxWidth().padding(Ui.Item),"Loading orders",48.dp)
+                orders!!.isEmpty() -> Text("No orders for this customer yet.",style=MaterialTheme.typography.bodySmall,color=Muted)
+                else -> orders!!.forEach {order ->
+                    val due=(order.amounts.totalPaisa-order.payments.sumOf {it.amountPaisa}).coerceAtLeast(0)
+                    Surface(onClick={openOrder(order)},shape=Ui.Field,color=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.5f),modifier=Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(Ui.Item),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                            Text(order.orderNumber,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            Text("${shortDate(order.orderedAt)} · Total ${Money.pkr(order.amounts.totalPaisa)}",style=MaterialTheme.typography.bodySmall,color=Muted)
+                            Row(verticalAlignment=Alignment.CenterVertically) {
+                                StatusPill(order.orderStatus.label,when(order.orderStatus) {OrderStatus.ACTIVE -> Violet;OrderStatus.READY_FOR_PICKUP -> Amber;OrderStatus.COMPLETE -> Mint;OrderStatus.CANCEL -> Muted})
+                                Spacer(Modifier.weight(1f))
+                                if(due>0 && order.orderStatus!=OrderStatus.CANCEL) Text("Due ${Money.pkr(due)}",style=MaterialTheme.typography.bodySmall,fontWeight=FontWeight.SemiBold,color=Coral)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -567,7 +591,7 @@ internal fun CustomerDetailsSheet(customer:Customer,busy:Boolean,serverError:Str
     var prescription by remember(customer.id) {mutableStateOf(customer.latestPrescription ?: Prescription())}
     var error by remember {mutableStateOf<String?>(null)}
     ModalBottomSheet(onDismissRequest={if(!busy) dismiss()},sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true)) {
-        LazyColumn(modifier=Modifier.imePadding().navigationBarsPadding().testTag("customer-profile-form"),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        LazyColumn(modifier=Modifier.imePadding().navigationBarsPadding().testTag("customer-profile-form"),contentPadding=PaddingValues(Ui.Gutter),verticalArrangement=Arrangement.spacedBy(Ui.Item)) {
             item {Text("Customer details",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)}
             item {Text("These details are used for future orders. Previous orders keep their original prescription.",style=MaterialTheme.typography.bodySmall,color=Muted)}
             if(resolveConflict!=null) item {Column {
@@ -575,20 +599,22 @@ internal fun CustomerDetailsSheet(customer:Customer,busy:Boolean,serverError:Str
                 TextButton(enabled=!busy,onClick={resolveConflict(false)}) {Text("Use cloud version")}
                 TextButton(enabled=!busy,onClick={resolveConflict(true)}) {Text("Retry my saved changes")}
             }}
-            item {OutlinedTextField(name,{name=it.take(120)},label={Text("Customer name")},singleLine=true,modifier=Modifier.fillMaxWidth())}
-            item {OutlinedTextField(mobile,{mobile=it.take(20)},label={Text("Mobile number")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Phone),modifier=Modifier.fillMaxWidth())}
-            item {Text("Latest prescription",fontWeight=FontWeight.SemiBold)}
+            item {AppTextField(name,{name=it.take(FieldRules.NameMax);error=null},"Customer name",error=FieldRules.name(name)!=null,supporting=FieldRules.name(name) ?: "${name.length}/${FieldRules.NameMax}")}
+            item {AppTextField(mobile,{mobile=it.filter {c ->c.isDigit() || c in "+ -()"}.take(20);error=null},"Mobile number",keyboard=KeyboardOptions(keyboardType=KeyboardType.Phone),error=FieldRules.mobile(mobile)!=null,supporting=FieldRules.mobile(mobile))}
+            item {SectionLabel("Latest prescription")}
             item {EyePrescriptionEditor("OD · Right eye",prescription.distanceRight) {prescription=prescription.copy(distanceRight=it)}}
             item {EyePrescriptionEditor("OS · Left eye",prescription.distanceLeft) {prescription=prescription.copy(distanceLeft=it)}}
-            item {Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(prescription.addRight.orEmpty(),{prescription=prescription.copy(addRight=it.ifBlank {null})},label={Text("ADD OD")},modifier=Modifier.weight(1f))
-                OutlinedTextField(prescription.addLeft.orEmpty(),{prescription=prescription.copy(addLeft=it.ifBlank {null})},label={Text("ADD OS")},modifier=Modifier.weight(1f))
+            item {Row(horizontalArrangement=Arrangement.spacedBy(Ui.Tight)) {
+                AppTextField(prescription.addRight.orEmpty(),{prescription=prescription.copy(addRight=FieldRules.decimalInput(it.replace("+",""),6).ifBlank {null})},"ADD OD",Modifier.weight(1f),fill=false,keyboard=KeyboardOptions(keyboardType=KeyboardType.Decimal),error=FieldRules.add(prescription.addRight.orEmpty(),"ADD OD")!=null,supporting=FieldRules.add(prescription.addRight.orEmpty(),"ADD OD"))
+                AppTextField(prescription.addLeft.orEmpty(),{prescription=prescription.copy(addLeft=FieldRules.decimalInput(it.replace("+",""),6).ifBlank {null})},"ADD OS",Modifier.weight(1f),fill=false,keyboard=KeyboardOptions(keyboardType=KeyboardType.Decimal),error=FieldRules.add(prescription.addLeft.orEmpty(),"ADD OS")!=null,supporting=FieldRules.add(prescription.addLeft.orEmpty(),"ADD OS"))
             }}
-            item {OutlinedTextField(prescription.pd.orEmpty(),{prescription=prescription.copy(pd=it.ifBlank {null})},label={Text("PD")},modifier=Modifier.fillMaxWidth())}
-            item {OutlinedTextField(notes,{notes=it.take(4000)},label={Text("Customer notes")},modifier=Modifier.fillMaxWidth())}
+            item {AppTextField(prescription.pd.orEmpty(),{prescription=prescription.copy(pd=FieldRules.decimalInput(it,5).ifBlank {null})},"PD (mm)",keyboard=KeyboardOptions(keyboardType=KeyboardType.Decimal),error=FieldRules.pd(prescription.pd.orEmpty())!=null,supporting=FieldRules.pd(prescription.pd.orEmpty()))}
+            item {AppTextField(notes,{notes=it.take(FieldRules.NotesMax)},"Customer notes",singleLine=false,minLines=2,error=FieldRules.notes(notes)!=null,supporting=FieldRules.notes(notes) ?: "${notes.length}/${FieldRules.NotesMax}")}
             (error ?: serverError)?.let {message ->item {Text(message,color=MaterialTheme.colorScheme.error)}}
             item {Button(enabled=!busy,onClick={try {
-                val normalized=PakistanPhone.normalize(mobile) ?: error("Enter a valid Pakistani mobile number.")
+                FieldRules.name(name)?.let {error(it)};FieldRules.mobile(mobile)?.let {error(it)}
+                listOf(FieldRules.add(prescription.addRight.orEmpty(),"ADD OD"),FieldRules.add(prescription.addLeft.orEmpty(),"ADD OS"),FieldRules.pd(prescription.pd.orEmpty()),FieldRules.notes(notes)).firstNotNullOfOrNull {it}?.let {error(it)}
+                val normalized=PakistanPhone.normalize(mobile)!!
                 val updated=customer.copy(name=name.trim(),mobile=mobile.trim(),normalizedMobile=normalized,notes=notes.trim(),latestPrescription=prescription,
                     previousMobiles=(customer.previousMobiles+customer.normalizedMobile).distinct().filter {it!=normalized})
                 OpticalRules.validateCustomer(updated);OpticalRules.validateEye(prescription.distanceRight);OpticalRules.validateEye(prescription.distanceLeft)
@@ -599,139 +625,10 @@ internal fun CustomerDetailsSheet(customer:Customer,busy:Boolean,serverError:Str
     }
 }
 
-@Composable
-private fun AnalyticsScreen(state:UiState,model:TodoViewModel) {
-    val snapshot=state.snapshot
-    val visibleOrders=(state.todos+snapshot.completedTodos.values).distinctBy {it.id}
-    val bookedPaisa=visibleOrders.filter {it.orderStatus!=OrderStatus.CANCEL}.sumOf {it.amounts.totalPaisa}
-    val collectedPaisa=visibleOrders.sumOf {order -> order.payments.sumOf {it.amountPaisa}}
-    val outstandingPaisa=(bookedPaisa-collectedPaisa).coerceAtLeast(0)
-    var days by rememberSaveable {mutableIntStateOf(7)}
-    var periodMenu by remember {mutableStateOf(false)}
-    var trendPriority by rememberSaveable {mutableStateOf<String?>(null)}
-    val today=LocalDate.now()
-    LaunchedEffect(days,state.session?.userId,snapshot.totals.revision) {model.loadAnalytics(days)}
-    val summary=state.analyticsSummary
-    val local=state.localAnalytics
-    val overlay=state.pendingAnalytics
-    val priorities=snapshot.priorityCounts
-    val cloudTrend=if(trendPriority==null) summary?.trend else summary?.priorityTrends?.get(trendPriority)
-    val baseTrend=cloudTrend ?: if(trendPriority==null) local?.trend else local?.priorityTrends?.get(trendPriority)
-    val pendingTrend=if(cloudTrend==null) null else if(trendPriority==null) overlay?.trend else overlay?.priorityTrends?.get(trendPriority)
-    val values=(0 until days).map {index -> (baseTrend?.getOrNull(index) ?: 0)+(pendingTrend?.getOrNull(index) ?: 0)}
-    val withDeadline=((summary ?: local)?.withDeadline ?: 0)+(overlay?.withDeadline ?: 0)
-    val onTime=if(withDeadline==0) null else (((summary ?: local)?.onTime ?: 0)+(overlay?.onTime ?: 0)).toFloat()/withDeadline
-    LazyColumn(contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-        item {Text("Business overview",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)}
-        item {Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                SummaryMetric("Sales · PKR",(bookedPaisa/100).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),MaterialTheme.colorScheme.primaryContainer,MaterialTheme.colorScheme.onPrimaryContainer,Modifier.weight(1f)) {}
-                SummaryMetric("Collected · PKR",(collectedPaisa/100).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),MaterialTheme.colorScheme.secondaryContainer,MaterialTheme.colorScheme.onSecondaryContainer,Modifier.weight(1f)) {}
-            }
-            SummaryMetric("Outstanding · PKR",(outstandingPaisa/100).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),MaterialTheme.colorScheme.errorContainer,MaterialTheme.colorScheme.onErrorContainer,Modifier.fillMaxWidth(),horizontal=true) {}
-            Text("Device view; the backend migration includes account-wide indexed reporting for the production dashboard.",style=MaterialTheme.typography.labelSmall,color=Muted)
-        }}
-        item {PortfolioChart(snapshot.orderStatusCounts)}
-        item {Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surface) {Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically) {
-                Row(Modifier.weight(1f),verticalAlignment=Alignment.CenterVertically) {
-                    Text("Completions",Modifier.weight(1f,fill=false),fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.titleMedium)
-                    HelpTip("Includes orders delivered again after reopening.","About deliveries")
-                }
-                Box {
-                    TextButton(onClick={periodMenu=true}) {Text("Last $days days");Icon(DaymarkIcons.ExpandMore,null,Modifier.size(18.dp))}
-                    DropdownMenu(expanded=periodMenu,onDismissRequest={periodMenu=false}) {
-                        listOf(7,30).forEach {period -> DropdownMenuItem(text={Text("Last $period days")},onClick={days=period;periodMenu=false},trailingIcon={if(days==period) Icon(DaymarkIcons.Check,null)})}
-                    }
-                }
-            }
-            Text(values.sum().toString(),style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Bold)
-            TrendChart(values,today,if(trendPriority==null) Violet else priorityColor(trendPriority!!))
-            if(state.analyticsLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            Text(if(summary==null) "Saved deliveries · this device" else "Cloud deliveries · last $days days",color=Muted,style=MaterialTheme.typography.labelSmall)
-        }}}
-        item {Surface(shape=RoundedCornerShape(24.dp),color=Color(0xFF24243B),modifier=Modifier.fillMaxWidth()) {Row(Modifier.padding(22.dp),verticalAlignment=Alignment.CenterVertically) {
-            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(5.dp)) {Text("On time",color=Color.White,fontWeight=FontWeight.SemiBold);Text("Orders with promised dates",color=Color(0xFFCBC9DE),style=MaterialTheme.typography.labelSmall)}
-            Text(onTime?.let {"${(it*100).toInt()}%"} ?: "—",color=Color(0xFFB9F0D1),fontWeight=FontWeight.Bold,style=MaterialTheme.typography.headlineMedium)
-        }}}
-    }
-}
-
-@Composable
-private fun PortfolioChart(counts:Map<OrderStatus,Int>) {
-    val values=OrderStatus.entries.map {counts[it] ?: 0}
-    val colors=listOf(Violet,Amber,Mint,Muted)
-    val total=values.sum()
-    val track=Paper
-    val animation by animateFloatAsState(if(total==0) 0f else 1f,tween(800),label="Portfolio chart")
-    Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surface) {Row(Modifier.fillMaxWidth().padding(22.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(24.dp)) {
-        Box(Modifier.size(132.dp).semantics {contentDescription=OrderStatus.entries.joinToString {"${it.label}: ${counts[it] ?: 0}"}},contentAlignment=Alignment.Center) {
-            Canvas(Modifier.fillMaxSize()) {
-                val stroke=16.dp.toPx()
-                val diameter=size.minDimension-stroke
-                val bounds=Size(diameter,diameter)
-                val offset=Offset(stroke/2,stroke/2)
-                drawArc(track,0f,360f,false,offset,bounds,style=Stroke(stroke))
-                var angle=-90f
-                values.forEachIndexed {index,value ->
-                    val sweep=if(total==0) 0f else value.toFloat()/total*360f
-                    if(sweep>0) drawArc(colors[index],angle,(sweep-4f).coerceAtLeast(1f)*animation,false,offset,bounds,style=Stroke(stroke,cap=StrokeCap.Round))
-                    angle+=sweep
-                }
-            }
-            Column(horizontalAlignment=Alignment.CenterHorizontally) {Text(total.toString(),fontWeight=FontWeight.Bold,style=MaterialTheme.typography.headlineMedium);Text("orders",color=Muted,style=MaterialTheme.typography.labelSmall)}
-        }
-        Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(14.dp)) {
-            OrderStatus.entries.map {it.label}.forEachIndexed {index,label ->Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.size(8.dp).background(colors[index],CircleShape));Text(label,Modifier.weight(1f),style=MaterialTheme.typography.labelMedium,color=Muted);Text(values[index].toString(),fontWeight=FontWeight.Bold)
-            }}
-        }
-    }}
-}
-
-@Composable private fun TrendChart(values:List<Int>,today:LocalDate,color:Color) {
-    val track=Paper
-    val axis=Muted
-    val maximum=(values.maxOrNull() ?: 0).coerceAtLeast(1)
-    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-        Text("Complete orders",style=MaterialTheme.typography.labelSmall,color=Muted)
-        Canvas(Modifier.fillMaxWidth().height(168.dp).semantics {
-            contentDescription=values.mapIndexed {i,count -> "${today.minusDays((values.size-1-i).toLong())}: $count completed"}.joinToString(", ")
-        }) {
-            val left=32.dp.toPx();val bottom=28.dp.toPx();val top=8.dp.toPx()
-            val height=size.height-bottom-top;val width=size.width-left-4.dp.toPx()
-            val text=android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                this.color=android.graphics.Color.argb(255,(axis.red*255).toInt(),(axis.green*255).toInt(),(axis.blue*255).toInt());textSize=11.sp.toPx()
-            }
-            val ticks=listOf(0,maximum/2,maximum).distinct()
-            ticks.forEach {tick ->
-                val y=top+height*(1f-tick.toFloat()/maximum)
-                drawLine(track,Offset(left,y),Offset(size.width,y),1.dp.toPx())
-                drawContext.canvas.nativeCanvas.drawText(tick.toString(),0f,y+4.dp.toPx(),text)
-            }
-            drawLine(axis.copy(alpha=.4f),Offset(left,top),Offset(left,top+height),1.dp.toPx())
-            drawLine(axis.copy(alpha=.4f),Offset(left,top+height),Offset(size.width,top+height),1.dp.toPx())
-            val slot=width/values.size.coerceAtLeast(1)
-            values.forEachIndexed {index,value ->
-                if(value>0) {
-                    val barHeight=height*value/maximum
-                    drawRoundRect(color,Offset(left+index*slot+slot*.18f,top+height-barHeight),Size(slot*.64f,barHeight),androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()))
-                }
-            }
-            listOf(0,(values.size-1)/2,values.size-1).distinct().filter {it>=0}.forEach {index ->
-                val label=today.minusDays((values.size-1-index).toLong()).format(DateTimeFormatter.ofPattern("MMM d"))
-                val x=(left+index*slot+slot/2-text.measureText(label)/2).coerceIn(left,(size.width-text.measureText(label)).coerceAtLeast(left))
-                drawContext.canvas.nativeCanvas.drawText(label,x,size.height-5.dp.toPx(),text)
-            }
-        }
-        Text("Date · ${ZoneId.systemDefault().id}",style=MaterialTheme.typography.labelSmall,color=Muted,modifier=Modifier.align(Alignment.CenterHorizontally))
-        if(values.sum()==0) Text("No completions in this period.",color=Muted,style=MaterialTheme.typography.bodySmall)
-    }
-}
 
 @Composable
 private fun InboxScreen(snapshot:Snapshot,allowed:Boolean,notificationSettings:()->Unit,model:TodoViewModel,open:(String)->Unit) {
-    LazyColumn(contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+    LazyColumn(contentPadding=PaddingValues(Ui.Gutter),verticalArrangement=Arrangement.spacedBy(Ui.Item)) {
         if(!allowed) item {Surface(modifier=Modifier.fillMaxWidth(),shape=RoundedCornerShape(20.dp),color=MaterialTheme.colorScheme.surfaceVariant) {Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically,modifier=Modifier.fillMaxWidth()) {
                 Icon(DaymarkIcons.NotificationsOff,null,tint=Muted)
@@ -768,15 +665,23 @@ private fun SettingsScreen(state:UiState,allowed:Boolean,requestPermission:()->U
     var clearDevice by remember {mutableStateOf(false)}
     var shopDialog by remember {mutableStateOf(false)}
     var storageExpanded by rememberSaveable {mutableStateOf(false)}
-    val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/x-ndjson")) {uri -> uri?.let(model::exportWorkspace)}
+    var exportMenu by remember {mutableStateOf(false)}
+    var exportSelection by remember {mutableStateOf(OpticalExportSelection.BACKUP)}
+    val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/x-ndjson")) {uri -> if(uri!=null) model.exportWorkspace(uri,exportSelection)}
     val import=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {uri -> uri?.let(model::previewTaskImport)}
     LaunchedEffect(Unit) {model.loadStorageStats()}
-    LazyColumn(contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
-        item {Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surface,modifier=Modifier.fillMaxWidth()) {Row(Modifier.padding(20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
+    LazyColumn(contentPadding=PaddingValues(Ui.Gutter),verticalArrangement=Arrangement.spacedBy(Ui.Section)) {
+        // Account card: a guest taps it to sign in; a signed-in user sees their email (Log out is under Account actions).
+        item {Surface(onClick=onLogout,enabled=state.session?.localOnly==true && !state.busy,shape=Ui.Card,color=MaterialTheme.colorScheme.surface,modifier=Modifier.fillMaxWidth()) {Row(Modifier.padding(Ui.Gutter),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(14.dp)) {
             Box(Modifier.size(48.dp).background(Violet.copy(alpha=.1f),CircleShape),contentAlignment=Alignment.Center) {Icon(DaymarkIcons.Person,null,tint=Violet)}
-            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {Text("Account",fontWeight=FontWeight.SemiBold);Text(if(state.session?.localOnly==true) "Sign in to your account" else state.session?.email.orEmpty(),color=Muted,style=MaterialTheme.typography.bodySmall)}
+            Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                Text("Account",fontWeight=FontWeight.SemiBold)
+                Text(if(state.session?.localOnly==true) "Not signed in · tap to sign in" else state.session?.email.orEmpty(),color=Muted,style=MaterialTheme.typography.bodySmall,maxLines=1,overflow=TextOverflow.Ellipsis)
+            }
+            if(state.session?.localOnly==true) Icon(DaymarkIcons.ChevronRight,null,tint=Muted)
         }}}
-        item {SettingsRow(DaymarkIcons.Schedule,"Shop details & timings","Used in pickup messages",{shopDialog=true})}
+        if(com.daymark.todo.BuildConfig.DEMO_DATA) item {SettingsRow(DaymarkIcons.Storage,"Load demo data","33 customers, about 50 orders (test builds only)",{model.loadDemoData()},enabled=!state.busy)}
+        item {SettingsRow(DaymarkIcons.Schedule,"Shop details & timings",ShopPreferences.load(context).phone.let {if(it.isBlank()) "Add your WhatsApp number — used in customer messages" else "WhatsApp $it · hours and address"},{shopDialog=true})}
         item {Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surface) {Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                 Icon(if(allowed) DaymarkIcons.NotificationsActive else DaymarkIcons.NotificationsOff,null,tint=if(allowed) Mint else Muted)
@@ -809,10 +714,10 @@ private fun SettingsScreen(state:UiState,allowed:Boolean,requestPermission:()->U
             Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     Icon(DaymarkIcons.Storage,null,tint=Violet)
-                    Column {Text("On this device",fontWeight=FontWeight.SemiBold);Text("Active tasks and changes waiting to sync",color=Muted,style=MaterialTheme.typography.bodySmall)}
+                    Column {Text("On this device",fontWeight=FontWeight.SemiBold);Text("Orders, customers and changes waiting to sync",color=Muted,style=MaterialTheme.typography.bodySmall)}
                 }
                 state.storageStats?.let {stats ->
-                    Text("${stats.activeTasks} active tasks · ${storageLabel(stats.allocatedBytes)}",style=MaterialTheme.typography.bodySmall,color=Muted)
+                    Text("${stats.activeTasks} open orders · ${storageLabel(stats.allocatedBytes)}",style=MaterialTheme.typography.bodySmall,color=Muted)
                     if(stats.queuedOperations>0) Text("${stats.queuedOperations} changes waiting to sync",style=MaterialTheme.typography.bodySmall,color=Muted)
                     if(stats.quarantinedChanges>0) Text("${stats.quarantinedChanges} changes need recovery",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.error)
                 }
@@ -821,29 +726,28 @@ private fun SettingsScreen(state:UiState,allowed:Boolean,requestPermission:()->U
                 if(state.session?.localOnly==false) StorageAction(DaymarkIcons.DeleteOutline,"Clear history cache",
                     "Remove downloaded history from this device.",
                     "Cloud history and pending changes stay safe. Download history again when online.",!state.busy) {clearCache=true}
-                else StorageAction(DaymarkIcons.DeleteOutline,"Clear local history",
-                    "Remove finished-task history from this device.",
-                    "This cannot be undone. Export first; active tasks and lifetime counts stay.",!state.busy) {clearLocalHistory=true}
-                StorageAction(DaymarkIcons.Download,"Export device data",
-                    "Save a copy of the data stored on this device.",
-                    "The file contains readable task data, not passwords. It is a device snapshot, not a full cloud backup; store it privately.",!state.busy) {export.launch("daymark-export.jsonl")}
-                StorageAction(DaymarkIcons.Upload,"Import active tasks",
-                    "Add active-task copies from a Daymark export.",
-                    "Creates new task copies and clears all reminders. Finished tasks, history and queued changes are skipped. Reopening the same file resumes safely.",!state.busy) {import.launch(arrayOf("*/*"))}
+                else Text("Completed and cancelled orders stay on this device for customer records and analytics. Export a backup regularly.",style=MaterialTheme.typography.bodySmall,color=Muted)
+                StorageAction(DaymarkIcons.Download,"Export orders or customers",
+                    "Choose active orders, customers, or a combined backup.",
+                    "Includes structured prescriptions and amounts, but not frame photo files. Keep customer data private.",!state.busy) {exportMenu=true}
+                StorageAction(DaymarkIcons.Upload,"Import orders & customers",
+                    "Preview an optical export before adding records.",
+                    "Known customer phone numbers are reused. Existing profiles are preserved. Imports are retry-safe; reminders and frame photos must be added again.",!state.busy) {import.launch(arrayOf("*/*"))}
                 }
             }
         }}
         item {Text("Account actions",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold)}
-        item {SettingsRow(DaymarkIcons.Logout,if(state.session?.localOnly==true) "Sign in" else "Sign out","Your saved tasks stay on this device",onLogout,enabled=!state.busy)}
+        if(state.session?.localOnly==false) item {SettingsRow(DaymarkIcons.Logout,"Log out","Your saved orders stay on this device",onLogout,enabled=!state.busy)}
         item {SettingsRow(DaymarkIcons.Storage,"Clear device data","Signs out and clears this account on this device",{clearDevice=true},enabled=!state.busy)}
         if(state.session?.localOnly==false) item {SettingsRow(DaymarkIcons.DeleteOutline,"Delete account","Permanently remove your account and cloud data",{model.dismissMessage();deletionDialog=true},tint=Coral,enabled=!state.busy)}
         item {Text(LocalBrand.current.config.name+" · "+com.daymark.todo.BuildConfig.VERSION_NAME,modifier=Modifier.fillMaxWidth(),color=Muted,style=MaterialTheme.typography.labelSmall)}
     }
-    if(state.importActiveCount!=null) AlertDialog(onDismissRequest=model::cancelTaskImport,title={Text("Import task copies?")},text={Text("${state.importActiveCount} active tasks will be added with new IDs. ${state.importSkippedCount} completed/deleted tasks and all history/queued changes will be skipped. All reminders will be cleared. If a quota or storage limit stops the import, reopen the same file to resume without duplicating imported copies.")},confirmButton={TextButton(onClick=model::applyTaskImport,enabled=!state.busy && state.importActiveCount>0) {Text("Import tasks")}},dismissButton={TextButton(onClick=model::cancelTaskImport) {Text("Cancel")}})
-    if(shopDialog) ShopSettingsDialog(context,{shopDialog=false})
+    if(exportMenu) AlertDialog(onDismissRequest={exportMenu=false},title={Text("Export")},text={Column {OpticalExportSelection.entries.forEach {selection ->TextButton(onClick={exportSelection=selection;exportMenu=false;export.launch("raheel-optics-${selection.name.lowercase()}.jsonl")}) {Text(selection.label)}}}},confirmButton={TextButton(onClick={exportMenu=false}) {Text("Close")}})
+    if(state.importActiveCount!=null) AlertDialog(onDismissRequest=model::cancelTaskImport,title={Text("Import optical records?")},text={Text("${state.importActiveCount} active orders and ${state.importCustomerCount} customers found. ${state.importSkippedCount} finished orders and diagnostic history will be skipped. Known phone numbers reuse existing customers without overwriting them. Orders get new import numbers; old reminders and frame images are not restored. Reopening the same file safely resumes the import.")},confirmButton={TextButton(onClick=model::applyTaskImport,enabled=!state.busy && (state.importActiveCount>0 || state.importCustomerCount>0)) {Text("Import")}},dismissButton={TextButton(onClick=model::cancelTaskImport) {Text("Cancel")}})
+        if(shopDialog) ShopSettingsScreen {shopDialog=false}
     if(clearCache) AlertDialog(onDismissRequest={clearCache=false},title={Text("Clear offline history?")},text={Text("Cloud history and unsynced changes stay safe. You can download history again when online. Android may reuse the freed database space.")},confirmButton={TextButton(onClick={clearCache=false;model.clearHistoryCache()}) {Text("Clear cache")}},dismissButton={TextButton(onClick={clearCache=false}) {Text("Cancel")}})
     if(clearLocalHistory) AlertDialog(onDismissRequest={clearLocalHistory=false},title={Text("Clear local history?")},text={Text("These history entries have no cloud copy. Export device data first if you need them. Active tasks and lifetime counts stay; removed history cannot be undone.")},confirmButton={TextButton(onClick={clearLocalHistory=false;model.clearLocalHistory()}) {Text("Clear history")}},dismissButton={TextButton(onClick={clearLocalHistory=false}) {Text("Cancel")}})
-    if(clearDevice) AlertDialog(onDismissRequest={clearDevice=false},title={Text("Clear device data?")},text={Text("This signs you out and clears this account’s local tasks and history. Cloud data stays in your account. Local-only tasks have no cloud copy; export first. Pending changes must be synced or resolved before clearing.")},confirmButton={TextButton(onClick={clearDevice=false;model.clearDeviceData()}) {Text("Clear device data")}},dismissButton={TextButton(onClick={clearDevice=false}) {Text("Cancel")}})
+    if(clearDevice) AlertDialog(onDismissRequest={clearDevice=false},title={Text("Clear device data?")},text={Text("This signs you out and clears this account’s local orders and customer records. Cloud data stays in your account. Local-only orders have no cloud copy; export first. Pending changes must be synced or resolved before clearing.")},confirmButton={TextButton(onClick={clearDevice=false;model.clearDeviceData()}) {Text("Clear device data")}},dismissButton={TextButton(onClick={clearDevice=false}) {Text("Cancel")}})
     if(themeDialog) {
         val choice=LocalThemeChoice.current
         val setTheme=LocalSetTheme.current
@@ -859,37 +763,12 @@ private fun SettingsScreen(state:UiState,allowed:Boolean,requestPermission:()->U
     if(deletionDialog) {
         var current by remember {mutableStateOf("")}
         AlertDialog(onDismissRequest={if(!state.busy) deletionDialog=false},title={Text("Delete account?")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Text("This permanently removes your account, tasks and history. Unsynced changes on this phone will also be removed.")
+            Text("This permanently removes your account, orders and customer records. Unsynced changes on this phone will also be removed.")
             PasswordField(current,{current=it},"Current password")
             state.message?.let {Text(it,color=MaterialTheme.colorScheme.error)}
         }},confirmButton={TextButton(onClick={model.deleteAccount(current)},enabled=!state.busy && current.isNotBlank()) {Text(if(state.busy) "Deleting…" else "Delete account")}},dismissButton={TextButton(onClick={deletionDialog=false},enabled=!state.busy) {Text("Cancel")}})
     }
     if(passwordDialog) PasswordDialog(state.busy,state.message,{passwordDialog=false}) {current,replacement ->model.changePassword(current,replacement) {passwordDialog=false}}
-}
-
-@Composable
-private fun ShopSettingsDialog(context:android.content.Context,dismiss:()->Unit) {
-    val prefs=remember {context.getSharedPreferences("optical-shop",android.content.Context.MODE_PRIVATE)}
-    var name by rememberSaveable {mutableStateOf(prefs.getString("name","Raheel Optics") ?: "Raheel Optics")}
-    var phone by rememberSaveable {mutableStateOf(prefs.getString("phone","") ?: "")}
-    var address by rememberSaveable {mutableStateOf(prefs.getString("address","") ?: "")}
-    var weekdays by rememberSaveable {mutableStateOf(prefs.getString("weekdays","10:00 AM – 8:00 PM") ?: "10:00 AM – 8:00 PM")}
-    var sunday by rememberSaveable {mutableStateOf(prefs.getString("sunday","Closed") ?: "Closed")}
-    var error by remember {mutableStateOf<String?>(null)}
-    AlertDialog(onDismissRequest=dismiss,title={Text("Shop details & timings")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-        OutlinedTextField(name,{name=it.take(120)},label={Text("Shop name")},singleLine=true,modifier=Modifier.fillMaxWidth())
-        OutlinedTextField(phone,{phone=it.take(20);error=null},label={Text("Contact / WhatsApp")},placeholder={Text("0300 1234567")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Phone),singleLine=true,modifier=Modifier.fillMaxWidth())
-        OutlinedTextField(address,{address=it.take(300)},label={Text("Shop address")},minLines=2,modifier=Modifier.fillMaxWidth())
-        OutlinedTextField(weekdays,{weekdays=it.take(80)},label={Text("Monday–Saturday")},singleLine=true,modifier=Modifier.fillMaxWidth())
-        OutlinedTextField(sunday,{sunday=it.take(80)},label={Text("Sunday")},singleLine=true,modifier=Modifier.fillMaxWidth())
-        Text("Currency PKR · Time zone Asia/Karachi",style=MaterialTheme.typography.labelMedium,color=Muted)
-        error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
-    }},confirmButton={TextButton(onClick={
-        val normalized=PakistanPhone.normalize(phone)
-        if(name.trim().length<2) error="Enter the shop name."
-        else if(phone.isNotBlank() && normalized==null) error="Enter a valid Pakistani mobile number."
-        else {prefs.edit {putString("name",name.trim());putString("phone",phone.trim());putString("normalized_phone",normalized.orEmpty());putString("address",address.trim());putString("weekdays",weekdays.trim());putString("sunday",sunday.trim())};dismiss()}
-    }) {Text("Save")}},dismissButton={TextButton(onClick=dismiss) {Text("Cancel")}})
 }
 
 @Composable private fun StorageAction(icon:androidx.compose.ui.graphics.vector.ImageVector,title:String,detail:String,help:String,enabled:Boolean,onClick:()->Unit) {
@@ -926,7 +805,7 @@ private fun storageLabel(bytes:Long):String=if(bytes<1024*1024) "${bytes/1024} K
     val uriHandler=androidx.compose.ui.platform.LocalUriHandler.current
     val policyUrl=com.daymark.todo.BuildConfig.PRIVACY_POLICY_URL
     val publicPolicy=runCatching { java.net.URI(policyUrl).let {it.scheme=="https" && !it.host.isNullOrBlank() && it.userInfo==null} }.getOrDefault(false)
-    AlertDialog(onDismissRequest=dismiss,title={Text("Privacy")},text={Text("Cloud accounts store email, account details, tasks and history with Supabase. Local-only task workspaces stay on this phone. Device task databases use app-private storage without separate database encryption; session credentials use Android Keystore protection. Reminders use Android notifications and depend on device permissions. The app has no advertising or third-party tracking SDKs. Account deletion removes live cloud records, but does not remotely erase other devices or exported files. Provider backup and operational-log retention periods are currently unconfirmed.",modifier=Modifier.verticalScroll(rememberScrollState()))},confirmButton={TextButton(onClick=dismiss) {Text("Close")}},dismissButton={if(publicPolicy) TextButton(onClick={uriHandler.openUri(policyUrl)}) {Text("Full policy")}})
+    AlertDialog(onDismissRequest=dismiss,title={Text("Privacy")},text={Text("Cloud accounts store your email, customers, orders and payments with Supabase. Guest orders stay on this phone. Device databases use app-private storage without separate database encryption; session credentials use Android Keystore protection. Reminders use Android notifications and depend on device permissions. Released builds send crash reports (device model, Android version, app version and the error trace, never customer or order details) to Google Firebase Crashlytics so faults can be fixed. There is no advertising or analytics tracking. Account deletion removes live cloud records, but does not remotely erase other devices or exported files.",modifier=Modifier.verticalScroll(rememberScrollState()))},confirmButton={TextButton(onClick=dismiss) {Text("Close")}},dismissButton={if(publicPolicy) TextButton(onClick={uriHandler.openUri(policyUrl)}) {Text("Full policy")}})
 }
 
 @Composable private fun PasswordDialog(busy:Boolean,serverError:String?,dismiss:()->Unit,save:(String,String)->Unit) {
@@ -943,9 +822,12 @@ private fun storageLabel(bytes:Long):String=if(bytes<1024*1024) "${bytes/1024} K
         (error ?: serverError)?.let {Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
     }},confirmButton={TextButton(onClick={try {PasswordRules.validate(current,replacement);require(confirm==replacement) {"Passwords don't match."};save(current,replacement)} catch(e:Exception) {error=e.message}},enabled=!busy) {Text(if(busy) "Updating…" else "Update password")}},dismissButton={TextButton(onClick=dismiss,enabled=!busy) {Text("Cancel")}})
 }
-@Composable private fun PasswordField(value:String,change:(String)->Unit,label:String) {
+@Composable private fun PasswordField(value:String,change:(String)->Unit,label:String,error:String?=null) {
     var visible by remember {mutableStateOf(false)}
-    OutlinedTextField(value,change,label={Text(label)},singleLine=true,visualTransformation=if(visible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),modifier=Modifier.fillMaxWidth(),trailingIcon={IconButton(onClick={visible=!visible}) {Icon(if(visible) DaymarkIcons.VisibilityOff else DaymarkIcons.Visibility,if(visible) "Hide password" else "Show password")}})
+    OutlinedTextField(value,change,label={Text(label)},singleLine=true,shape=Ui.Field,isError=error!=null,supportingText=error?.let {{Text(it)}},
+        visualTransformation=if(visible) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
+        keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),modifier=Modifier.fillMaxWidth(),
+        trailingIcon={TipIconButton(if(visible) DaymarkIcons.VisibilityOff else DaymarkIcons.Visibility,if(visible) "Hide password" else "Show password",{visible=!visible})})
 }
 
 @Composable private fun AccountScreen(state:UiState,model:TodoViewModel) {
@@ -961,51 +843,62 @@ private fun storageLabel(bytes:Long):String=if(bytes<1024*1024) "${bytes/1024} K
     var signupError by remember {mutableStateOf<String?>(null)}
     var privacy by remember {mutableStateOf(false)}
     if(privacy) PrivacyDialog {privacy=false}
+    val emailError=email.takeIf {it.isNotBlank() && !Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$").matches(it.trim())}?.let {"Enter a valid email address."}
     Surface(color=Paper,modifier=Modifier.fillMaxSize()) {
-        LazyColumn(contentPadding=PaddingValues(horizontal=28.dp,vertical=40.dp),verticalArrangement=Arrangement.spacedBy(20.dp),modifier=Modifier.imePadding().safeDrawingPadding()) {
-            item {Column(verticalArrangement=Arrangement.spacedBy(14.dp)) {
-                Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                    Surface(shape=RoundedCornerShape(20.dp),color=MaterialTheme.colorScheme.surface,shadowElevation=2.dp) {
-                        BrandLogo(Modifier.size(72.dp).padding(6.dp))
-                    }
-                    Text(LocalBrand.current.config.name,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.headlineMedium,modifier=Modifier.weight(1f))
+        LazyColumn(contentPadding=PaddingValues(horizontal=Ui.Section,vertical=32.dp),verticalArrangement=Arrangement.spacedBy(Ui.Section),
+            horizontalAlignment=Alignment.CenterHorizontally,modifier=Modifier.imePadding().safeDrawingPadding()) {
+            item {Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(Ui.Tight)) {
+                Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surface,shadowElevation=2.dp) {BrandLogo(Modifier.size(88.dp).padding(8.dp))}
+                Text(LocalBrand.current.config.name,fontWeight=FontWeight.Bold,style=MaterialTheme.typography.headlineMedium)
+                Text(LocalBrand.current.config.tagline,color=Muted,style=MaterialTheme.typography.bodyMedium)
+            }}
+            item {AppCard {
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(selected=!register,onClick={register=false;signupError=null;confirmation=""},shape=SegmentedButtonDefaults.itemShape(0,2),enabled=!state.busy) {Text("Sign in")}
+                    SegmentedButton(selected=register,onClick={register=true;signupError=null},shape=SegmentedButtonDefaults.itemShape(1,2),enabled=!state.busy) {Text("Create account")}
                 }
-                Text(if(register) "Create your account" else "Welcome back",style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.SemiBold)
-                Text(if(register) "Save customer orders and keep them in sync." else "Sign in to see your shop orders across devices.",color=Muted,style=MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(4.dp))
+                Text(if(register) "Create your shop account" else "Welcome back",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.SemiBold)
+                Text(if(register) "Keep orders and customers in sync on every phone." else "Sign in to see your shop orders on every phone.",color=Muted,style=MaterialTheme.typography.bodyMedium)
+                state.message?.let {Message(it,model::dismissMessage)}
+                if(state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                AppTextField(email,{email=it.trim().take(254)},"Email",keyboard=KeyboardOptions(keyboardType=KeyboardType.Email),error=emailError!=null,supporting=emailError)
+                PasswordField(password,{password=it.take(128);signupError=null},"Password")
+                if(register) PasswordField(confirmation,{confirmation=it.take(128);signupError=null},"Confirm password",signupError)
+                if(register && signupError==null) Text("Use at least 12 characters.",color=Muted,style=MaterialTheme.typography.bodySmall)
+                Button(onClick={if(register) {
+                    signupError=runCatching {RegistrationRules.validate(password,confirmation)}.exceptionOrNull()?.message
+                    if(signupError==null) model.register(email,password)
+                } else model.login(email,password)},enabled=!state.busy && state.config.configured && email.isNotBlank() && emailError==null && password.isNotBlank(),
+                    shape=Ui.Field,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text(if(register) "Create account" else "Sign in")}
+                TextButton(onClick={model.dismissMessage();forgot=true},enabled=!state.busy,modifier=Modifier.align(Alignment.End)) {Text("Forgot password?")}
             }}
-            state.message?.let {item {Message(it,model::dismissMessage)}}
-            if(state.busy) item {LinearProgressIndicator(Modifier.fillMaxWidth())}
-            item {OutlinedTextField(email,{email=it},label={Text("Email")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email),modifier=Modifier.fillMaxWidth())}
-            item {PasswordField(password,{password=it;signupError=null},"Password")}
-            if(register) item {PasswordField(confirmation,{confirmation=it;signupError=null},"Confirm password")}
-            if(register) item {Text("Use at least 12 characters.",color=Muted,style=MaterialTheme.typography.bodySmall)}
-            signupError?.let {item {Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}}
-            item {Button(onClick={if(register) {
-                signupError=runCatching {RegistrationRules.validate(password,confirmation)}.exceptionOrNull()?.message
-                if(signupError==null) model.register(email,password)
-            } else model.login(email,password)},enabled=!state.busy && state.config.configured,modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)) {Text(if(register) "Create account" else "Sign in")}}
-            item {Column(Modifier.fillMaxWidth(),horizontalAlignment=Alignment.CenterHorizontally) {
-                TextButton(onClick={register=!register;signupError=null;confirmation=""},enabled=!state.busy) {Text(if(register) "Sign in instead" else "Create account")}
-                TextButton(onClick={model.dismissMessage();forgot=true},enabled=!state.busy) {Text("Forgot password?")}
+            item {Row(verticalAlignment=Alignment.CenterVertically) {
+                HorizontalDivider(Modifier.weight(1f));Text("  or  ",color=Muted,style=MaterialTheme.typography.labelMedium);HorizontalDivider(Modifier.weight(1f))
             }}
-            item {HorizontalDivider()}
-            item {OutlinedButton(onClick=model::continueAsGuest,enabled=!state.busy,modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)) {Text("Continue as guest")}}
-            item {Text("Guest orders sync to your account when you sign in.",color=Muted,style=MaterialTheme.typography.bodySmall)}
-            item {TextButton(onClick={privacy=true},modifier=Modifier.fillMaxWidth()) {Text("Privacy")}}
-            if(!state.config.configured) item {Text("Service is being set up. Please try again later.",color=Muted,style=MaterialTheme.typography.bodySmall)}
+            item {Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(Ui.Tight)) {
+                OutlinedButton(onClick=model::continueAsGuest,enabled=!state.busy,shape=Ui.Field,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text("Continue as guest")}
+                Text("Guest orders stay on this phone and move to your account when you sign in.",color=Muted,style=MaterialTheme.typography.bodySmall,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
+            }}
+            if(!state.config.configured) item {Text("Cloud sign-in is not available yet. You can work as a guest.",color=Muted,style=MaterialTheme.typography.bodySmall)}
+            item {TextButton(onClick={privacy=true}) {Text("Privacy")}}
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TodoEditor(original:Todo?,busy:Boolean,serverError:String?,dismiss:()->Unit,repeatDraft:Todo?=null,save:(Todo)->Unit) {
+internal fun TodoEditor(original:Todo?,busy:Boolean,serverError:String?,dismiss:()->Unit,repeatDraft:Todo?=null,lookupCustomer:suspend (String)->Customer?={null},save:(Todo)->Unit) {
     val existing=original ?: repeatDraft
     val context=LocalContext.current
+    val imageScope=rememberCoroutineScope()
     val pickerTheme=if(MaterialTheme.colorScheme.background.red<.2f) android.R.style.Theme_Material_Dialog_Alert else android.R.style.Theme_Material_Light_Dialog_Alert
     var title by rememberSaveable(existing?.id) {mutableStateOf(existing?.title.orEmpty())}
     var mobile by rememberSaveable(existing?.id) {mutableStateOf(existing?.customerMobile.orEmpty())}
-    var orderNumber by rememberSaveable(existing?.id) {mutableStateOf(existing?.orderNumber?.takeIf {it.isNotBlank()} ?: "RO-${java.time.format.DateTimeFormatter.ofPattern("yyMMdd-HHmm").format(java.time.LocalDateTime.now())}")}
+    // Order numbers are never typed: edits keep theirs, new and repeated orders get a fresh one.
+    val orderNumber by rememberSaveable(existing?.id) {mutableStateOf(if(original!=null) original.orderNumber.ifBlank {OrderNumbers.generate()} else OrderNumbers.generate())}
+    var attempted by remember {mutableStateOf(false)}
+    var orderedAt by rememberSaveable(existing?.id) {mutableLongStateOf(existing?.orderedAt ?: System.currentTimeMillis())}
     var notes by rememberSaveable(existing?.id) {mutableStateOf(existing?.notes.orEmpty())}
     var priority by rememberSaveable(existing?.id) {mutableStateOf(existing?.priority ?: "Medium")}
     var due by rememberSaveable(existing?.id) {mutableStateOf(existing?.dueAt)}
@@ -1020,49 +913,135 @@ private fun TodoEditor(original:Todo?,busy:Boolean,serverError:String?,dismiss:(
     var addLeft by rememberSaveable(existing?.id) {mutableStateOf(existing?.prescription?.addLeft.orEmpty())}
     var pd by rememberSaveable(existing?.id) {mutableStateOf(existing?.prescription?.pd.orEmpty())}
     var frameUri by rememberSaveable(existing?.id) {mutableStateOf(existing?.frame?.localImageUri)}
-    var framePrice by rememberSaveable(existing?.id) {mutableStateOf(existing?.amounts?.framePaisa?.takeIf {it>0 }?.let {"%.2f".format(java.util.Locale.US,it/100.0)}.orEmpty())}
-    var lensPrice by rememberSaveable(existing?.id) {mutableStateOf(existing?.amounts?.lensPaisa?.takeIf {it>0 }?.let {"%.2f".format(java.util.Locale.US,it/100.0)}.orEmpty())}
-    var paid by rememberSaveable(existing?.id) {mutableStateOf(existing?.payments?.sumOf {it.amountPaisa}?.takeIf {it>0}?.let {"%.2f".format(java.util.Locale.US,it/100.0)}.orEmpty())}
-    val imagePicker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) {uri -> if(uri!=null) frameUri=uri.toString()}
+    var framePrice by rememberSaveable(existing?.id) {mutableStateOf(existing?.amounts?.framePaisa?.takeIf {it>0}?.let {(it/100).toString()}.orEmpty())}
+    var lensPrice by rememberSaveable(existing?.id) {mutableStateOf(existing?.amounts?.lensPaisa?.takeIf {it>0}?.let {(it/100).toString()}.orEmpty())}
+    var paid by rememberSaveable(existing?.id) {mutableStateOf(existing?.payments?.sumOf {it.amountPaisa}?.takeIf {it>0}?.let {(it/100).toString()}.orEmpty())}
+    var extrasPrice by rememberSaveable(existing?.id) {mutableStateOf(existing?.amounts?.extrasPaisa?.takeIf {it>0}?.let {(it/100).toString()}.orEmpty())}
+    var discount by rememberSaveable(existing?.id) {mutableStateOf(existing?.amounts?.discountPaisa?.takeIf {it>0}?.let {(it/100).toString()}.orEmpty())}
+    var lensType by rememberSaveable(existing?.id) {mutableStateOf(existing?.lens?.let {it.material.ifBlank {it.coating}}.orEmpty())}
+    var frameType by rememberSaveable(existing?.id) {mutableStateOf(existing?.frame?.let {listOf(it.brand,it.model).filter {part ->part.isNotBlank()}.joinToString(" ")}.orEmpty())}
+    var nearRight by remember(existing?.id) {mutableStateOf(existing?.prescription?.nearRight)}
+    var nearLeft by remember(existing?.id) {mutableStateOf(existing?.prescription?.nearLeft)}
+    var linkedCustomerId by rememberSaveable(existing?.id) {mutableStateOf(existing?.customerId)}
+    var knownCustomer by remember {mutableStateOf<Customer?>(null)}
+    var prefilledFor by remember {mutableStateOf<String?>(null)}
+    LaunchedEffect(mobile) {
+        knownCustomer=null
+        if(original==null && PakistanPhone.normalize(mobile)!=null) {
+            kotlinx.coroutines.delay(350)
+            try {
+                val customer=lookupCustomer(mobile);knownCustomer=customer
+                // An existing customer's details and latest prescription fill the form automatically (only into untouched fields).
+                if(customer!=null && prefilledFor!=customer.id) {
+                    prefilledFor=customer.id;linkedCustomerId=customer.id
+                    if(title.isBlank()) title=customer.name
+                    val untouched=rightEye==EyePrescription() && leftEye==EyePrescription() && nearRight==null && nearLeft==null && addRight.isBlank() && addLeft.isBlank() && pd.isBlank()
+                    customer.latestPrescription?.takeIf {untouched}?.let {rx ->rightEye=rx.distanceRight;leftEye=rx.distanceLeft;nearRight=rx.nearRight;nearLeft=rx.nearLeft;addRight=rx.addRight.orEmpty();addLeft=rx.addLeft.orEmpty();pd=rx.pd.orEmpty()}
+                }
+            } catch(e:CancellationException) {throw e} catch(_:Exception) { /* Saving still validates and links the mobile atomically. */ }
+        }
+    }
+    var importingPhoto by remember {mutableStateOf(false)}
+    fun importPhoto(uri:android.net.Uri) {imageScope.launch {
+        importingPhoto=true
+        try {frameUri=kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {FrameImages.import(context,uri)}}
+        catch(e:Exception) {if(e is CancellationException) throw e;error=e.message ?: "Cannot save the photo."}
+        finally {importingPhoto=false}
+    }}
+    val imagePicker=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) {uri ->if(uri!=null) importPhoto(uri)}
+    val cameraFile=remember {java.io.File(java.io.File(context.cacheDir,"camera").apply {mkdirs()},"${UUID.randomUUID()}.jpg")}
+    val cameraUri=remember {androidx.core.content.FileProvider.getUriForFile(context,context.packageName+".files",cameraFile)}
+    val camera=rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) {success ->if(success) importPhoto(cameraUri)}
     fun picker(initial:Long?,result:(Long)->Unit) {
         val chosen=Instant.ofEpochMilli(initial ?: System.currentTimeMillis()).atZone(ZoneId.systemDefault())
         DatePickerDialog(context,pickerTheme,{_,year,month,day ->TimePickerDialog(context,pickerTheme,{_,hour,minute ->result(LocalDate.of(year,month+1,day).atTime(hour,minute).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())},chosen.hour,chosen.minute,android.text.format.DateFormat.is24HourFormat(context)).show()},chosen.year,chosen.monthValue-1,chosen.dayOfMonth).show()
     }
+    fun amountOrZero(value:String)=if(FieldRules.amount(value,"")==null) Money.parse(value) else 0L
+    val nameError=FieldRules.name(title).takeIf {attempted || title.isNotBlank()}
+    val mobileError=FieldRules.mobile(mobile).takeIf {attempted || mobile.isNotBlank()}
+    val frameError=FieldRules.amount(framePrice,"Frame price");val lensError=FieldRules.amount(lensPrice,"Lens price")
+    val extrasError=FieldRules.amount(extrasPrice,"Extras");val discountFormat=FieldRules.amount(discount,"Discount")
+    val paidFormat=FieldRules.amount(paid,"Amount paid")
+    val gross=amountOrZero(framePrice)+amountOrZero(lensPrice)+amountOrZero(extrasPrice)
+    val total=(gross-amountOrZero(discount)).coerceAtLeast(0)
+    val discountError=discountFormat ?: FieldRules.discount(amountOrZero(discount),gross)
+    val alreadyPaid=existing?.payments?.sumOf {it.amountPaisa} ?: 0L
+    val paidError=paidFormat ?: FieldRules.paid(amountOrZero(paid),total) ?: if(original!=null && amountOrZero(paid)<alreadyPaid) "Paid can't be reduced here. Record a refund from the order details." else null
+    val addRightError=FieldRules.add(addRight,"ADD OD");val addLeftError=FieldRules.add(addLeft,"ADD OS");val pdError=FieldRules.pd(pd)
+    val frameTypeError=FieldRules.text(frameType,"Frame type",FieldRules.DetailMax)
+    val lensTypeError=FieldRules.text(lensType,"Lens type",FieldRules.DetailMax);val notesError=FieldRules.notes(notes)
+    val eyeError=FieldRules.eye(rightEye)?.let {"Right eye: $it"} ?: FieldRules.eye(leftEye)?.let {"Left eye: $it"}
+        ?: nearRight?.let {FieldRules.eye(it)}?.let {"Near right: $it"} ?: nearLeft?.let {FieldRules.eye(it)}?.let {"Near left: $it"}
+    fun submit() {try {
+                attempted=true
+                listOf(FieldRules.name(title),FieldRules.mobile(mobile),eyeError,addRightError,addLeftError,pdError,frameTypeError,lensTypeError,frameError,lensError,extrasError,discountError,paidError,notesError)
+                    .firstNotNullOfOrNull {it}?.let {throw IllegalArgumentException(it)}
+                val now=System.currentTimeMillis()
+                val at=if(!reminderEnabled) null else when(reminderMode) {
+                    "Before promised time" -> Rules.deadlineReminder(due,durationMinutes,true)
+                    "After promised time" -> Rules.deadlineReminder(due,durationMinutes,false)
+                    else -> null
+                }
+                val normalized=PakistanPhone.normalize(mobile) ?: throw IllegalArgumentException("Enter a valid Pakistani mobile number.")
+                fun paisa(value:String,label:String):Long=if(value.isBlank()) 0 else ((value.toBigDecimalOrNull() ?: throw IllegalArgumentException("Enter a valid $label amount."))*java.math.BigDecimal(100)).longValueExact()
+                check(!importingPhoto) {"Wait for the frame photo to finish saving."}
+                val framePaisa=Money.parse(framePrice)
+                val lensPaisa=Money.parse(lensPrice)
+                val paidPaisa=Money.parse(paid)
+                val oldPayments=existing?.payments.orEmpty()
+                val payments=Money.payments(oldPayments,paidPaisa,now)
+                val todo=(existing ?: Todo(UUID.randomUUID().toString(),title)).copy(title=title.trim(),customerMobile=mobile.trim(),normalizedMobile=normalized,customerId=linkedCustomerId,orderNumber=orderNumber,
+                    prescription=(existing?.prescription ?: Prescription()).copy(distanceRight=rightEye,distanceLeft=leftEye,nearRight=nearRight,nearLeft=nearLeft,addRight=addRight.ifBlank {null},addLeft=addLeft.ifBlank {null},pd=pd.ifBlank {null}),
+                    frame=(existing?.frame ?: FrameDetails()).copy(localImageUri=frameUri,brand="",model=frameType.trim()),lens=(existing?.lens ?: LensDetails()).copy(material=lensType.trim(),coating=""),amounts=OrderAmounts(framePaisa,lensPaisa,Money.parse(extrasPrice),Money.parse(discount),0),payments=payments,
+                    notes=notes.trim(),priority=priority,orderedAt=orderedAt,dueAt=due,reminderAt=at,updatedAt=now)
+                nearRight?.let(OpticalRules::validateEye);nearLeft?.let(OpticalRules::validateEye)
+                Rules.validate(todo,now,existing==null || at!=existing.reminderAt,existing==null || due!=existing.dueAt);save(todo)
+            } catch(e:Exception) {error=e.message}}
     if(durationPicker) DurationPicker(durationMinutes,{durationPicker=false}) {durationMinutes=it;durationPicker=false}
-    ModalBottomSheet(onDismissRequest={if(!busy) dismiss()},containerColor=Paper) {
-        LazyColumn(contentPadding=PaddingValues(start=24.dp,end=24.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(14.dp),modifier=Modifier.imePadding()) {
-            item {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-                Text(if(original==null) "New order" else "Edit order",Modifier.weight(1f),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
-                IconButton(onClick=dismiss,enabled=!busy) {Icon(DaymarkIcons.Close,"Close task editor")}
-            }}
+    FullScreenForm(if(original==null) "New order" else "Edit order",dismiss,"Save order",busy || importingPhoto,{submit()}) {padding ->
+        LazyColumn(contentPadding=PaddingValues(Ui.Gutter),verticalArrangement=Arrangement.spacedBy(Ui.Item),modifier=Modifier.padding(padding).testTag("order-form")) {
             item {Text("Customer",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
-            if(repeatDraft!=null) item {Text("Review the copied prescription before saving. Previous orders keep their original prescription.",style=MaterialTheme.typography.bodySmall,color=Muted)}
-            item {OutlinedTextField(title,{if(it.length<=Rules.MaxTitleLength) {title=it;error=null}},label={Text("Customer name")},singleLine=true,modifier=Modifier.fillMaxWidth())}
-            item {OutlinedTextField(mobile,{mobile=it.take(20);error=null},label={Text("Mobile number")},placeholder={Text("0300 1234567")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Phone),modifier=Modifier.fillMaxWidth())}
-            item {OutlinedTextField(orderNumber,{orderNumber=it.take(40).uppercase()},label={Text("Order number")},singleLine=true,modifier=Modifier.fillMaxWidth())}
+            item {AppTextField(title,{title=it.take(FieldRules.NameMax);error=null},"Customer name",error=nameError!=null,supporting=nameError ?: "${title.length}/${FieldRules.NameMax}")}
+            item {AppTextField(mobile,{mobile=it.filter {c ->c.isDigit() || c in "+ -()"}.take(20);error=null},"Mobile number",placeholder="0300 1234567",keyboard=KeyboardOptions(keyboardType=KeyboardType.Phone),error=mobileError!=null,supporting=mobileError)}
+            if(original!=null) item {Text("Order ${orderNumber}",style=MaterialTheme.typography.bodySmall,color=Muted)}
             item {Text("Distance prescription",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
             item {EyePrescriptionEditor("OD · Right eye",rightEye,{rightEye=it})}
             item {EyePrescriptionEditor("OS · Left eye",leftEye,{leftEye=it})}
+            item {TextButton(onClick={if(nearRight==null && nearLeft==null) {nearRight=EyePrescription();nearLeft=EyePrescription()} else {nearRight=null;nearLeft=null}}) {Text(if(nearRight==null) "+ Near prescription" else "Remove near prescription")}}
+            nearRight?.let {eye ->item {EyePrescriptionEditor("Near · OD",eye) {nearRight=it}}}
+            nearLeft?.let {eye ->item {EyePrescriptionEditor("Near · OS",eye) {nearLeft=it}}}
             item {Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(addRight,{addRight=it.take(7)},label={Text("ADD OD")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f))
-                OutlinedTextField(addLeft,{addLeft=it.take(7)},label={Text("ADD OS")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f))
+                AppTextField(addRight,{addRight=FieldRules.decimalInput(it.replace("+",""),6)},"ADD OD",Modifier.weight(1f),fill=false,keyboard=KeyboardOptions(keyboardType=KeyboardType.Decimal),error=addRightError!=null,supporting=addRightError)
+                AppTextField(addLeft,{addLeft=FieldRules.decimalInput(it.replace("+",""),6)},"ADD OS",Modifier.weight(1f),fill=false,keyboard=KeyboardOptions(keyboardType=KeyboardType.Decimal),error=addLeftError!=null,supporting=addLeftError)
             }}
-            item {OutlinedTextField(pd,{pd=it.take(7)},label={Text("PD (mm)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true,modifier=Modifier.fillMaxWidth())}
+            item {AppTextField(pd,{pd=FieldRules.decimalInput(it,5)},"PD (mm)",keyboard=KeyboardOptions(keyboardType=KeyboardType.Decimal),error=pdError!=null,supporting=pdError)}
             item {Text("Frame & payment",style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
-            item {OutlinedButton(onClick={imagePicker.launch("image/*")},modifier=Modifier.fillMaxWidth()) {Icon(DaymarkIcons.Upload,null);Spacer(Modifier.width(8.dp));Text(if(frameUri==null) "Upload frame image" else "Frame image selected · Change")}}
-            item {Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(framePrice,{framePrice=it.take(12)},label={Text("Frame · PKR")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f))
-                OutlinedTextField(lensPrice,{lensPrice=it.take(12)},label={Text("Lenses · PKR")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),modifier=Modifier.weight(1f))
+            item {FramePreview(frameUri,Modifier.fillMaxWidth().heightIn(max=180.dp))}
+            item {Row {
+                TextButton(onClick={imagePicker.launch(arrayOf("image/*"))},enabled=!importingPhoto) {Text("Choose frame photo")}
+                TextButton(onClick={runCatching {camera.launch(cameraUri)}.onFailure {error="No camera app is available."}},enabled=!importingPhoto) {Text("Camera")}
+                if(frameUri!=null) TextButton(onClick={frameUri=null}) {Text("Remove")}
             }}
-            item {OutlinedTextField(paid,{paid=it.take(12)},label={Text("Amount paid · PKR")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true,modifier=Modifier.fillMaxWidth())}
-            item {OutlinedTextField(notes,{notes=it.take(4000)},label={Text("Order notes")},minLines=2,maxLines=4,modifier=Modifier.fillMaxWidth())}
-            item {Row(verticalAlignment=Alignment.CenterVertically) {OutlinedButton(onClick={picker(due) {due=it;error=null}},modifier=Modifier.weight(1f)) {Icon(DaymarkIcons.Event,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(if(due==null) "Add promised date" else date(due))};if(due!=null) IconButton(onClick={due=null}) {Icon(DaymarkIcons.Close,"Remove promised date")}}}
+            item {AppTextField(frameType,{frameType=it.take(FieldRules.DetailMax)},"Frame type",error=frameTypeError!=null,supporting=frameTypeError)}
+            item {AppTextField(lensType,{lensType=it.take(FieldRules.DetailMax)},"Lens type",error=lensTypeError!=null,supporting=lensTypeError)}
+            item {Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+                AppTextField(framePrice,{framePrice=FieldRules.wholeInput(it)},"Frame · PKR",Modifier.weight(1f),fill=false,keyboard=KeyboardOptions(keyboardType=KeyboardType.Number),error=frameError!=null,supporting=frameError)
+                AppTextField(lensPrice,{lensPrice=FieldRules.wholeInput(it)},"Lenses · PKR",Modifier.weight(1f),fill=false,keyboard=KeyboardOptions(keyboardType=KeyboardType.Number),error=lensError!=null,supporting=lensError)
+            }}
+            item {AppTextField(paid,{paid=FieldRules.wholeInput(it)},"Amount paid · PKR",keyboard=KeyboardOptions(keyboardType=KeyboardType.Number),error=paidError!=null,supporting=paidError ?: "Order total ${Money.pkr(total)} · Balance ${Money.pkr((total-amountOrZero(paid)).coerceAtLeast(0))}")}
+            item {Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                AppTextField(extrasPrice,{extrasPrice=FieldRules.wholeInput(it)},"Extras · PKR",Modifier.weight(1f),fill=false,keyboard=KeyboardOptions(keyboardType=KeyboardType.Number),error=extrasError!=null,supporting=extrasError)
+                AppTextField(discount,{discount=FieldRules.wholeInput(it)},"Discount · PKR",Modifier.weight(1f),fill=false,keyboard=KeyboardOptions(keyboardType=KeyboardType.Number),error=discountError!=null,supporting=discountError)
+            }}
+            item {OutlinedButton(onClick={picker(orderedAt) {orderedAt=it}}) {Text("Order date · ${date(orderedAt)}")}}
+            item {AppTextField(notes,{notes=it.take(FieldRules.NotesMax)},"Order notes",singleLine=false,minLines=2,error=notesError!=null,supporting=notesError ?: "${notes.length}/${FieldRules.NotesMax}")}
+            item {Row(verticalAlignment=Alignment.CenterVertically) {OutlinedButton(onClick={picker(due) {due=it;error=null}},modifier=Modifier.weight(1f)) {Icon(DaymarkIcons.Event,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(if(due==null) "Add promised date" else date(due))};if(due!=null) TipIconButton(DaymarkIcons.Close,"Remove promised date",{due=null})}}
             item {Row(verticalAlignment=Alignment.CenterVertically) {
                 Row(Modifier.weight(1f),verticalAlignment=Alignment.CenterVertically) {
                     Text("Additional reminder",Modifier.weight(1f,fill=false),style=MaterialTheme.typography.titleSmall)
                     HelpTip("Turn this on to add an alert before or after the promised-ready time.","About order reminders")
                 }
-                Switch(checked=reminderEnabled,onCheckedChange={reminderEnabled=it},modifier=Modifier.semantics {contentDescription="Task reminder"})
+                Switch(checked=reminderEnabled,onCheckedChange={reminderEnabled=it},modifier=Modifier.semantics {contentDescription="Order reminder"})
             }}
             if(reminderEnabled) item {
                 if(due==null) Text("Add a promised date to set a reminder.",color=Muted,style=MaterialTheme.typography.bodySmall)
@@ -1091,26 +1070,6 @@ private fun TodoEditor(original:Todo?,busy:Boolean,serverError:String?,dismiss:(
                 }
             }
             (error ?: serverError)?.let {item {Text(it,color=MaterialTheme.colorScheme.error,modifier=Modifier.semantics {liveRegion=LiveRegionMode.Polite})}}
-            item {Button(onClick={try {
-                val now=System.currentTimeMillis()
-                val at=if(!reminderEnabled) null else when(reminderMode) {
-                    "Before promised time" -> Rules.deadlineReminder(due,durationMinutes,true)
-                    "After promised time" -> Rules.deadlineReminder(due,durationMinutes,false)
-                    else -> null
-                }
-                val normalized=PakistanPhone.normalize(mobile) ?: throw IllegalArgumentException("Enter a valid Pakistani mobile number.")
-                fun paisa(value:String,label:String):Long=if(value.isBlank()) 0 else ((value.toBigDecimalOrNull() ?: throw IllegalArgumentException("Enter a valid $label amount."))*java.math.BigDecimal(100)).longValueExact()
-                val framePaisa=paisa(framePrice,"frame")
-                val lensPaisa=paisa(lensPrice,"lens")
-                val paidPaisa=paisa(paid,"paid")
-                val oldPayments=existing?.payments.orEmpty()
-                val payments=if(paidPaisa==oldPayments.sumOf {it.amountPaisa}) oldPayments else if(paidPaisa==0L) emptyList() else listOf(Payment(UUID.randomUUID().toString(),paidPaisa))
-                val todo=(existing ?: Todo(UUID.randomUUID().toString(),title)).copy(title=title.trim(),customerMobile=mobile.trim(),normalizedMobile=normalized,orderNumber=orderNumber.trim(),
-                    prescription=(existing?.prescription ?: Prescription()).copy(distanceRight=rightEye,distanceLeft=leftEye,addRight=addRight.ifBlank {null},addLeft=addLeft.ifBlank {null},pd=pd.ifBlank {null}),
-                    frame=(existing?.frame ?: FrameDetails()).copy(localImageUri=frameUri),amounts=OrderAmounts(framePaisa=framePaisa,lensPaisa=lensPaisa),payments=payments,
-                    notes=notes.trim(),priority=priority,dueAt=due,reminderAt=at,updatedAt=now)
-                Rules.validate(todo,now,existing==null || at!=existing.reminderAt,existing==null || due!=existing.dueAt);save(todo)
-            } catch(e:Exception) {error=e.message}},enabled=!busy,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp)) {Text(if(busy) "Saving…" else "Save order")}}
         }
     }
 }
@@ -1118,29 +1077,36 @@ private fun TodoEditor(original:Todo?,busy:Boolean,serverError:String?,dismiss:(
 @Composable
 private fun EyePrescriptionEditor(label:String,value:EyePrescription,onChange:(EyePrescription)->Unit) {
     var addMenu by remember {mutableStateOf(false)}
+    var showSphere by remember {mutableStateOf(value.sphere.isNotBlank())}
     Surface(color=MaterialTheme.colorScheme.surface,shape=RoundedCornerShape(20.dp),modifier=Modifier.fillMaxWidth()) {
         Column(Modifier.padding(14.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Text(label,Modifier.weight(1f),fontWeight=FontWeight.SemiBold)
                 Box {TextButton(onClick={addMenu=true}) {Icon(DaymarkIcons.Add,null,Modifier.size(18.dp));Spacer(Modifier.width(4.dp));Text("Optional")}
                     DropdownMenu(expanded=addMenu,onDismissRequest={addMenu=false}) {
-                        if(value.cylinder==null) DropdownMenuItem(text={Text("Add CYL + AXIS")},onClick={onChange(value.copy(cylinder="",axis=1));addMenu=false})
-                        if(value.prism==null) DropdownMenuItem(text={Text("Add PRISM + BASE")},onClick={onChange(value.copy(prism="",base=PrismBase.IN));addMenu=false})
+                        if(!showSphere && value.sphere.isBlank()) DropdownMenuItem(text={Text("Sphere (SPH)")},onClick={showSphere=true;addMenu=false})
+                        if(value.cylinder==null) DropdownMenuItem(text={Text("Add CYL + AXIS")},onClick={onChange(value.copy(cylinder="",axis=null));addMenu=false})
+                        if(value.prism==null) DropdownMenuItem(text={Text("Add PRISM + BASE")},onClick={onChange(value.copy(prism="",base=null));addMenu=false})
                     }
                 }
             }
-            OutlinedTextField(value.sphere,{onChange(value.copy(sphere=it.take(7)))},label={Text("SPH")},placeholder={Text("Plano or -4.00")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true,modifier=Modifier.fillMaxWidth())
+            if(showSphere || value.sphere.isNotBlank()) Row(verticalAlignment=Alignment.CenterVertically) {
+                OutlinedTextField(value.sphere,{onChange(value.copy(sphere=it.filter {c ->c.isLetter() || c.isDigit() || c in "+-."}.take(7)))},label={Text("SPH")},placeholder={Text("Plano or -4.00")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true,modifier=Modifier.weight(1f))
+                TipIconButton(DaymarkIcons.Close,"Remove SPH",{showSphere=false;onChange(value.copy(sphere=""))})
+            }
             if(value.cylinder!=null) Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-                OutlinedTextField(value.cylinder,{onChange(value.copy(cylinder=it.take(7)))},label={Text("CYL")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true,modifier=Modifier.weight(1f))
-                OutlinedTextField(value.axis?.toString().orEmpty(),{onChange(value.copy(axis=it.toIntOrNull()))},label={Text("AXIS")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true,modifier=Modifier.weight(1f))
-                IconButton(onClick={onChange(value.copy(cylinder=null,axis=null))}) {Icon(DaymarkIcons.Close,"Remove CYL and AXIS")}
+                OutlinedTextField(value.cylinder,{onChange(value.copy(cylinder=it.filter {c ->c.isDigit() || c in "+-."}.take(7)))},label={Text("CYL")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true,modifier=Modifier.weight(1f))
+                OutlinedTextField(value.axis?.toString().orEmpty(),{onChange(value.copy(axis=it.filter(Char::isDigit).take(3).toIntOrNull()))},label={Text("AXIS")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true,modifier=Modifier.weight(1f))
+                TipIconButton(DaymarkIcons.Close,"Remove CYL and AXIS",{onChange(value.copy(cylinder=null,axis=null))})
             }
             if(value.prism!=null) Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-                OutlinedTextField(value.prism,{onChange(value.copy(prism=it.take(7)))},label={Text("PRISM")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true,modifier=Modifier.weight(1f))
+                OutlinedTextField(value.prism,{onChange(value.copy(prism=it.filter {c ->c.isDigit() || c in "."}.take(7)))},label={Text("PRISM")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true,modifier=Modifier.weight(1f))
                 var baseMenu by remember {mutableStateOf(false)}
                 Box(Modifier.weight(1f)) {OutlinedButton(onClick={baseMenu=true},modifier=Modifier.fillMaxWidth()) {Text(value.base?.name ?: "BASE")};DropdownMenu(baseMenu,{baseMenu=false}) {PrismBase.entries.forEach {base ->DropdownMenuItem(text={Text(base.name)},onClick={onChange(value.copy(base=base));baseMenu=false})}}}
-                IconButton(onClick={onChange(value.copy(prism=null,base=null))}) {Icon(DaymarkIcons.Close,"Remove PRISM and BASE")}
+                TipIconButton(DaymarkIcons.Close,"Remove PRISM and BASE",{onChange(value.copy(prism=null,base=null))})
             }
+            // "required" messages wait for Save; range and format problems show as soon as they are typed.
+            FieldRules.eye(value)?.takeUnless {it.contains("is required")}?.let {Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
         }
     }
 }

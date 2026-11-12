@@ -181,11 +181,14 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
         return resolved
     }
 
-    internal fun linkOrderCustomer(tx:com.powersync.db.internal.PowerSyncTransaction,order:Todo):Customer? {
+    suspend fun customerByMobile(normalized:String):Customer?=db.readTransaction {tx ->existingCustomerId(tx,normalized)?.let {currentCustomer(tx,it)}}
+
+    internal fun linkOrderCustomer(tx:com.powersync.db.internal.PowerSyncTransaction,order:Todo,updateProfile:Boolean=true):Customer? {
         if(order.normalizedMobile.isBlank()) return null
         val matched=existingCustomerId(tx,order.normalizedMobile)
         val id=order.customerId ?: matched ?: UUID.nameUUIDFromBytes("$accountId:customer:${order.normalizedMobile}".toByteArray()).toString()
         val previous=currentCustomer(tx,id)
+        if(previous!=null && !updateProfile) return previous
         val customer=(previous ?: Customer(id,order.title,order.customerMobile,order.normalizedMobile)).copy(
             name=order.title,mobile=order.customerMobile,normalizedMobile=order.normalizedMobile,latestPrescription=order.prescription)
         return upsertCustomerInTransaction(tx,customer)

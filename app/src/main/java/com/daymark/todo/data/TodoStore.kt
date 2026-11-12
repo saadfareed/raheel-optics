@@ -38,11 +38,14 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
     }
 
     /** Consistent, bounded-page JSONL export. No session tokens/configuration are included. */
-    suspend fun exportTo(output:Appendable) {
+    suspend fun exportTo(output:Appendable,selection:OpticalExportSelection=OpticalExportSelection.BACKUP) {
         val exportContext=currentCoroutineContext()
         db.readTransaction { tx ->
-        output.append("{\"format\":\"daymark-export\",\"version\":1}\n")
-        val sources=listOf(
+        output.append("{\"format\":\"raheel-optics-export\",\"version\":2}\n")
+        val sources=when(selection) {
+            OpticalExportSelection.CUSTOMERS ->listOf("customer" to "SELECT id,body AS payload FROM ($customerProfilesSql)")
+            OpticalExportSelection.ACTIVE_ORDERS ->listOf("task" to "WITH effective AS ($allOrders) SELECT id,body AS payload FROM effective WHERE ($opticalStatus) IN ('ACTIVE','READY_FOR_PICKUP')")
+            OpticalExportSelection.BACKUP ->listOf(
             "customer" to "SELECT id,body AS payload FROM ($customerProfilesSql)",
             "customerOperation" to "SELECT id,payload FROM optical_journal",
             "task" to "SELECT id,body AS payload FROM ($effectiveTodos)",
@@ -51,7 +54,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
             "localState" to "SELECT id,json_object('id',id,'status',status,'revision',revision) AS payload FROM local_state",
             "quarantinedChange" to "SELECT id,json_object('sdkData',sdk_data,'transactionId',transaction_id,'operationId',operation_id,'message',message,'createdAt',created_at) AS payload FROM quarantined_changes",
             "queuedChange" to "SELECT CAST(id AS TEXT) AS id,json_object('sdkData',data,'transactionId',tx_id) AS payload FROM ps_crud"
-        )
+        )}
         for((type,source) in sources) {
             var cursor=""
             while(true) {
@@ -117,7 +120,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         val draftById = drafts.associateBy { it.id }
         val remoteIds = remote.map { it.id }.toSet()
         val candidates = history.groupBy { it.todo.id }.mapValues { (_, entries) -> entries.maxBy { it.todo.revision } }
-        val completed = candidates.values.filter { it.action == "complete" }.map { it.todo }.filter { todo ->
+        val completed = candidates.values.filter { it.todo.status == "completed" && it.action in listOf("complete","edit") }.map { it.todo }.filter { todo ->
             if(localOnly) localStates[todo.id] == ("completed" to todo.revision)
             else {
                 val draft = draftById[todo.id]
@@ -177,7 +180,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
                 states.putAll(tx.getAll("SELECT id,json_extract(body,'$.status'),json_extract(body,'$.revision') FROM drafts WHERE id IN ($placeholders)",chunk) {it.getString(0)!! to (it.getString(1)!! to it.getLong(2)!!)})
                 conflictedIds.addAll(tx.getAll("SELECT DISTINCT json_extract(payload,'$.todo.id') FROM journal WHERE state='conflict' AND json_extract(payload,'$.todo.id') IN ($placeholders)",chunk) {it.getString(0)!!})
             }
-            val completed=history.filter {it.action=="complete" && (states[it.todo.id]==null || states[it.todo.id]==("completed" to it.todo.revision))}.associate {it.todo.id to it.todo}
+            val completed=history.filter {it.todo.status=="completed" && it.action in listOf("complete","edit") && (states[it.todo.id]==null || states[it.todo.id]==("completed" to it.todo.revision))}.associate {it.todo.id to it.todo}
             val statusCounts=tx.getAll("WITH effective AS ($allOrders) SELECT $opticalStatus,count(*) FROM effective GROUP BY $opticalStatus") {
                 OrderStatus.valueOf(it.getString(0)!!) to it.getLong(1)!!.toInt()
             }.toMap()
@@ -193,7 +196,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
             else tx.getOptional("SELECT json_extract(body,'$.status'),json_extract(body,'$.revision') FROM server_todos WHERE id=?",listOf(id)) {it.getString(0)!! to it.getLong(1)!!}
         if(state!=null && state.first!="completed") return@readTransaction null
         val entry=tx.getOptional("SELECT body FROM history_cache WHERE state<>'conflict' AND json_extract(body,'$.todo.id')=? ORDER BY CAST(json_extract(body,'$.todo.revision') AS INTEGER) DESC,occurred_at DESC,id DESC LIMIT 1",listOf(id)) {json.decodeFromString<HistoryEntry>(it.getString(0)!!)}
-        entry?.takeIf {it.action=="complete" && (state==null || state==("completed" to it.todo.revision))}?.todo
+        entry?.takeIf {it.todo.status=="completed" && it.action in listOf("complete","edit") && (state==null || state==("completed" to it.todo.revision))}?.todo
     }
 
     private val alertEvents="""
@@ -229,11 +232,6 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         val delivered=dueTaskAlerts().filter {addTaskAlert(it)}
         if(delivered.isNotEmpty()) notify(delivered)
         return dueTaskAlerts(limit=1).isNotEmpty()
-    }
-
-    suspend fun reminderSchedules(now:Long=System.currentTimeMillis(),limit:Int=ReminderPolicy.MaxScheduled):Map<String,Long> {
-        require(limit in 1..ReminderPolicy.MaxScheduled)
-        return db.getAll("WITH effective AS ($effectiveTodos) SELECT id,json_extract(body,'$.reminderAt') FROM effective WHERE coalesce(json_extract(body,'$.status'),'active')='active' AND json_extract(body,'$.reminderAt')>? ORDER BY json_extract(body,'$.reminderAt'),id LIMIT ?",listOf(now,limit)) {it.getString(0)!! to it.getLong(1)!!}.toMap()
     }
 
     /** SQL buckets preserve timezone/DST boundaries without deserializing event payloads. */
@@ -272,13 +270,6 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
 
     suspend fun activeTodo(id: String): Todo? = db.getOptional("WITH effective AS ($effectiveTodos) SELECT body FROM effective WHERE id=? AND coalesce(json_extract(body,'$.status'),'active')='active'",listOf(id)) {
         json.decodeFromString<Todo>(it.getString(0)!!)
-    }
-
-    suspend fun cachedAnalytics(days: Int, zone: String): HistoryAnalytics? = db.getOptional("SELECT body FROM analytics_cache WHERE id=?",listOf("$days:$zone")) {
-        json.decodeFromString<HistoryAnalytics>(it.getString(0)!!)
-    }
-    suspend fun cacheAnalytics(days: Int, zone: String, summary: HistoryAnalytics) {
-        db.execute("INSERT OR REPLACE INTO analytics_cache(id,body) VALUES(?,?)",listOf("$days:$zone",json.encodeToString(summary)))
     }
 
     /** Preserve the exact SDK row before acknowledging a single unreadable command. */
@@ -327,6 +318,11 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         ListCursor(it.getLong(0)!!,it.getString(1)!!)
     } ?: ListCursor(0,"00000000-0000-0000-0000-000000000000")
 
+    /** This device's frame-photo paths for these orders (photos are never uploaded with the order). */
+    suspend fun localPhotos(ids:List<String>):Map<String,String> = if(ids.isEmpty()) emptyMap() else db.getAll(
+        "WITH effective AS ($allOrders) SELECT id,json_extract(body,'$.frame.localImageUri') FROM effective WHERE id IN (${ids.joinToString(",") {"?"}}) AND json_extract(body,'$.frame.localImageUri') IS NOT NULL",
+        ids) {it.getString(0)!! to it.getString(1)!!}.toMap()
+
     suspend fun applyServerPage(rows: List<ServerChange>, cursor: ListCursor, totals: Totals?, limits:ResourceLimits?=null) {
         limits?.validate()
         db.writeTransaction { tx ->
@@ -336,7 +332,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
             }
             for(row in rows) {
                 check(row.id==row.todo.id) { "Invalid server task." }
-                tx.execute("INSERT OR REPLACE INTO server_todos(id,body,account_revision) VALUES(?,?,?)",listOf(row.id,json.encodeToString(if(row.todo.status=="active") row.todo else row.todo.copy(title="",notes="",dueAt=null,reminderAt=null)),row.accountRevision))
+                tx.execute("INSERT OR REPLACE INTO server_todos(id,body,account_revision) VALUES(?,?,?)",listOf(row.id,json.encodeToString(row.todo),row.accountRevision))
             }
             if(totals!=null && totals!=previousTotals) tx.execute("INSERT OR REPLACE INTO server_totals(id,active,completed,deleted,revision) VALUES('totals',?,?,?,?)",listOf(totals.active,totals.completed,totals.deleted,totals.revision))
             val previousLimits=if(limits==null) null else tx.getOptional("SELECT body FROM resource_limits WHERE id='policy'") {json.decodeFromString<ResourceLimits>(it.getString(0)!!)}
@@ -353,6 +349,30 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         }
     }
 
+    suspend fun orderById(id:String):Todo?=db.getOptional("WITH effective AS ($allOrders) SELECT body,$opticalStatus FROM effective WHERE id=?",listOf(id)) {
+        json.decodeFromString<Todo>(it.getString(0)!!).copy(orderStatus=OrderStatus.valueOf(it.getString(1)!!))
+    }
+
+    suspend fun orderAnalytics(query:OrderAnalyticsQuery):OrderAnalyticsSummary = db.readTransaction {tx ->
+        val (from,until)=query.bounds()
+        val accumulator=OrderAnalyticsAccumulator(from,until)
+        var after=""
+        while(true) {
+            val rows=tx.getAll("WITH effective AS ($allOrders) SELECT body,$opticalStatus FROM effective WHERE id>? ORDER BY id LIMIT 200",listOf(after)) {
+                json.decodeFromString<Todo>(it.getString(0)!!).copy(orderStatus=OrderStatus.valueOf(it.getString(1)!!))
+            }
+            rows.forEach(accumulator::add)
+            if(rows.size<200) break
+            after=rows.last().id
+        }
+        accumulator.result()
+    }
+
+    /** Every order for a customer (by profile id or normalized mobile), newest first, for the customer popup and WhatsApp statement. */
+    suspend fun customerOrders(customerId:String?,normalizedMobile:String,limit:Int=100):List<Todo> =
+        db.getAll("WITH effective AS ($allOrders) SELECT body,$opticalStatus FROM effective WHERE (? IS NOT NULL AND json_extract(body,'$.customerId')=?) OR (?<>'' AND json_extract(body,'$.normalizedMobile')=?) ORDER BY -coalesce(json_extract(body,'$.orderedAt'),0),id LIMIT ?",
+            listOf(customerId,customerId,normalizedMobile,normalizedMobile,limit)) {json.decodeFromString<Todo>(it.getString(0)!!).copy(orderStatus=OrderStatus.valueOf(it.getString(1)!!))}
+
     suspend fun customerDirectory(query:CustomerDirectoryQuery):List<CustomerDirectoryRow> {
         val filter=mutableListOf("1=1")
         val args=mutableListOf<Any?>()
@@ -362,6 +382,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
             args += "%$escaped%";args += "%${ListRules.phoneSearch(query.search) ?: escaped}%"
         }
         if(query.outstandingOnly) filter += "balance>0"
+        query.returning?.let {filter+=if(it) "order_count>1" else "order_count<=1"}
         val sort=when(query.sort) {
             CustomerSort.RECENT -> "last_order DESC"
             CustomerSort.NEWEST -> "first_order DESC"
@@ -369,8 +390,9 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
             CustomerSort.NAME_DESC -> "lower(json_extract(body,'$.title')) DESC"
             CustomerSort.MOST_ORDERS -> "order_count DESC"
             CustomerSort.BALANCE -> "balance DESC"
+            CustomerSort.SPEND -> "spent DESC"
         }
-        args += ListRules.PageSize+1;args += (query.page.coerceAtLeast(1)-1)*ListRules.PageSize
+        args += query.loaded.coerceAtLeast(1)*ListRules.PageSize+1;args += (query.page.coerceAtLeast(1)-1)*ListRules.PageSize
         return db.getAll("""
             WITH profiles AS ($customerProfilesSql), original AS ($allOrders), effective AS (
               SELECT e.id,e.body,1 AS is_order FROM original e
@@ -400,20 +422,21 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
               FROM tagged
             ), totals AS (
               SELECT identity,sum(is_order) AS order_count,max(order_time) AS last_order,min(coalesce(json_extract(profile,'$.createdAt'),order_time)) AS first_order,
+                sum(coalesce((SELECT sum(json_extract(value,'$.amountPaisa')) FROM json_each(json_extract(body,'$.payments'))),0)) AS spent,
                 sum(CASE WHEN optical_status='CANCEL' THEN 0 ELSE max(0,
                   coalesce(json_extract(body,'$.amounts.framePaisa'),0)+coalesce(json_extract(body,'$.amounts.lensPaisa'),0)
                   +coalesce(json_extract(body,'$.amounts.extrasPaisa'),0)-coalesce(json_extract(body,'$.amounts.discountPaisa'),0)
                   +coalesce(json_extract(body,'$.amounts.taxPaisa'),0)
                   -coalesce((SELECT sum(json_extract(value,'$.amountPaisa')) FROM json_each(json_extract(body,'$.payments'))),0)) END) AS balance
               FROM tagged GROUP BY identity
-            ) SELECT ranked.body,order_count,last_order,balance,profile FROM ranked JOIN totals USING(identity)
+            ) SELECT ranked.body,order_count,last_order,balance,profile,spent FROM ranked JOIN totals USING(identity)
               WHERE customer_rank=1 AND ${filter.joinToString(" AND ")}
               ORDER BY $sort,phone LIMIT ? OFFSET ?
         """.trimIndent(),args) {
             val order=json.decodeFromString<Todo>(it.getString(0)!!)
             val profile=it.getString(4)?.let {body ->json.decodeFromString<Customer>(body)}
                 ?: Customer(UUID.nameUUIDFromBytes("$accountId:customer:${order.normalizedMobile}".toByteArray()).toString(),order.title,order.customerMobile,order.normalizedMobile,createdAt=order.orderedAt,latestPrescription=order.prescription)
-            CustomerDirectoryRow(order.copy(customerId=profile.id),it.getLong(1)!!.toInt(),it.getLong(2)!!,it.getLong(3)!!,profile)
+            CustomerDirectoryRow(order.copy(customerId=profile.id),it.getLong(1)!!.toInt(),it.getLong(2)!!,it.getLong(3)!!,profile,it.getLong(5)!!)
         }
     }
 
@@ -431,7 +454,20 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
             args += term;args += term;args += phone;args += term
         }
         if(query.priority != null) { where += "coalesce(json_extract(body,'$.priority'),'Medium')=?"; args += query.priority }
+        val total="max(0,coalesce(json_extract(body,'$.amounts.framePaisa'),0)+coalesce(json_extract(body,'$.amounts.lensPaisa'),0)+coalesce(json_extract(body,'$.amounts.extrasPaisa'),0)-coalesce(json_extract(body,'$.amounts.discountPaisa'),0)+coalesce(json_extract(body,'$.amounts.taxPaisa'),0))"
+        val paid="coalesce((SELECT sum(json_extract(value,'$.amountPaisa')) FROM json_each(json_extract(body,'$.payments'))),0)"
+        when(query.payment) {
+            PaymentFilter.ANY ->Unit
+            PaymentFilter.UNPAID ->where+="($total)>0 AND ($paid)<=0"
+            PaymentFilter.PARTIAL ->where+="($paid)>0 AND ($paid)<($total)"
+            PaymentFilter.PAID ->where+="($paid)>=($total)"
+        }
+        query.orderedFrom?.let {where+="json_extract(body,'$.orderedAt')>=?";args+=it}
+        query.orderedUntil?.let {where+="json_extract(body,'$.orderedAt')<?";args+=it}
+        query.promisedFrom?.let {where+="json_extract(body,'$.dueAt')>=?";args+=it}
+        query.promisedUntil?.let {where+="json_extract(body,'$.dueAt')<?";args+=it}
         if(query.orderStatus != null) { where += "($opticalStatus)=?"; args += query.orderStatus.name }
+        query.view.statuses?.let {statuses -> where += "($opticalStatus) IN (${statuses.joinToString(",") {"?"}})"; statuses.forEach {args += it.name}}
         when(query.deadline) {
             DeadlineFilter.Any -> Unit
             DeadlineFilter.Overdue -> { where += "json_extract(body,'$.dueAt')<?"; args += now }
@@ -445,15 +481,17 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
             TodoSort.Latest -> "-coalesce(json_extract(body,'$.updatedAt'),0)"
             TodoSort.Newest -> "-coalesce(json_extract(body,'$.orderedAt'),0)"
             TodoSort.Oldest -> "coalesce(json_extract(body,'$.orderedAt'),0)"
+            TodoSort.CustomerName -> "lower(coalesce(json_extract(body,'$.title'),''))"
+            TodoSort.Balance -> "-max(0,($total)-($paid))"
             TodoSort.Priority -> "CASE coalesce(json_extract(body,'$.priority'),'Medium') WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 ELSE 2 END"
         }
-        if(cursor != null) { where += "($sort,id)>(?,?)"; args += cursor.value; args += cursor.id }
+        if(cursor != null) { where += "($sort,id)>(?,?)"; args += if(query.sort==TodoSort.CustomerName) cursor.textValue ?: "" else cursor.value; args += cursor.id }
         args += limit + 1
         val rows = db.getAll("""
-            WITH effective AS ($allOrders) SELECT body,$opticalStatus FROM effective WHERE ${where.joinToString(" AND ")} ORDER BY $sort,id LIMIT ?
-        """.trimIndent(), args) { json.decodeFromString<Todo>(it.getString(0)!!).copy(orderStatus=OrderStatus.valueOf(it.getString(1)!!)) }
+            WITH effective AS ($allOrders) SELECT body,$opticalStatus,($sort) FROM effective WHERE ${where.joinToString(" AND ")} ORDER BY $sort,id LIMIT ?
+        """.trimIndent(), args) { json.decodeFromString<Todo>(it.getString(0)!!).copy(orderStatus=OrderStatus.valueOf(it.getString(1)!!)) to if(query.sort==TodoSort.CustomerName) it.getString(2) else null }
         val page = rows.take(limit)
-        return TodoPage(page, if(rows.size > limit) page.last().let { ListCursor(ListRules.sortKey(it,query.sort),it.id) } else null)
+        return TodoPage(page.map {it.first}, if(rows.size > limit) page.last().let {(order,textKey) -> ListCursor(ListRules.sortKey(order,query.sort),order.id,textKey) } else null)
     }
 
     suspend fun historyPage(cursor: ListCursor? = null, limit: Int = ListRules.PageSize): HistoryPage {
@@ -495,7 +533,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
     }
 
     /** Bounded source scan; task bodies already removed by explicit history cleanup are excluded. */
-    suspend fun guestTransferPage(after:String,limit:Int=25):List<Todo> {
+    suspend fun guestTransferPage(after:String,limit:Int=ListRules.PageSize):List<Todo> {
         check(localOnly)
         return db.getAll("""
             SELECT s.id,coalesce(d.body,(SELECT json_extract(h.body,'$.todo') FROM history_cache h
@@ -567,7 +605,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         LIMIT 1
     """.trimIndent(),listOf(id,id,id,id,id,id)) {it.getString(0)!!}!=null
 
-    suspend fun save(todo: Todo, action: String, before: Todo?, importedSourceId: String? = null) = writes.withLock {
+    suspend fun save(todo: Todo, action: String, before: Todo?, importedSourceId: String? = null,updateCustomerProfile:Boolean=true) = writes.withLock {
         val now = System.currentTimeMillis()
         Rules.validate(todo, now,
             checkReminder=action in listOf("create", "edit") && (before == null || todo.reminderAt != before.reminderAt),
@@ -587,11 +625,11 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
                 if (current != null) check(if(before.status=="completed") current.status==before.status && current.revision==before.revision else current == before) { "This todo has changed. Open the latest version before editing." }
                 else if (before.status == "completed") {
                     val latest = tx.getOptional("SELECT body FROM history_cache WHERE state<>'conflict' AND json_extract(body,'$.todo.id')=? ORDER BY CAST(json_extract(body,'$.todo.revision') AS INTEGER) DESC,occurred_at DESC,id DESC LIMIT 1",listOf(before.id)) { json.decodeFromString<HistoryEntry>(it.getString(0)!!) }
-                    check(latest?.todo == before && latest.action == "complete") { "This todo has changed. Open the latest version before editing." }
+                    check(latest?.todo == before && latest.action in listOf("complete","edit")) { "This order has changed. Open the latest version before editing." }
                 } else error("This todo has changed. Open the latest version before editing.")
             }
             val previous = tx.getOptional("SELECT operation_id FROM drafts WHERE id=?", listOf(todo.id)) { it.getString(0)!! }
-            val customer=if(action in listOf("create","edit")) OpticalStore(db,accountId,localOnly=localOnly).linkOrderCustomer(tx,todo) else null
+            val customer=if(action in listOf("create","edit")) OpticalStore(db,accountId,localOnly=localOnly).linkOrderCustomer(tx,todo,updateCustomerProfile) else null
             val op = Operation(UUID.randomUUID().toString(), todo.copy(customerId=customer?.id ?: todo.customerId,updatedAt = now, revision=if(localOnly) todo.revision else (before?.revision ?: 0)+1), action, before?.revision ?: 0, previous, now, before?.status ?: "absent")
             val payload = json.encodeToString(op)
             if (localOnly) {
@@ -610,7 +648,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
                 tx.execute("INSERT INTO operation_requests(id,payload) VALUES(?,?)", listOf(op.id, payload))
             }
             if(importedSourceId!=null) tx.execute("INSERT INTO import_receipts(id,created_at) VALUES(?,?)",listOf(todo.id,now))
-            if (action in listOf("complete", "delete", "reopen")) {
+            if (action in listOf("complete", "delete", "reopen") || (action=="edit" && todo.status=="completed")) {
                 val h = HistoryEntry(op.id, if(localOnly) op.todo.copy(revision=todo.revision+1) else op.todo, action, now, !localOnly)
                 tx.execute("INSERT INTO history_cache(id,body,occurred_at,state) VALUES(?,?,?,?)", listOf(op.id, json.encodeToString(h), now, if (localOnly) "local" else "queued"))
             }
@@ -623,7 +661,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         db.writeTransaction { tx ->
             tx.execute("UPDATE journal SET state=?,ack_revision=?,message=? WHERE id=?", listOf(if(accepted) "acked" else "conflict", accountRevision, message, op.id))
             tx.execute("UPDATE history_cache SET state=? WHERE id=?", listOf(if(accepted) "confirmed" else "conflict", op.id))
-            if(accepted && op.action in listOf("complete","delete","reopen")) {
+            if(accepted && (op.action in listOf("complete","delete","reopen") || (op.action=="edit" && op.todo.status=="completed"))) {
                 val confirmed=HistoryEntry(op.id,op.todo.copy(revision=todoRevision),op.action,op.occurredAt,false)
                 tx.execute("UPDATE history_cache SET body=? WHERE id=?",listOf(json.encodeToString(confirmed),op.id))
             }
@@ -711,6 +749,4 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         if(batch.isNotEmpty()) notifyBatch(batch)
         return reminderTodos(dueBefore=System.currentTimeMillis(),undelivered=true,limit=1).isNotEmpty()
     }
-    suspend fun deliverMissedReminders(notify:(Todo)->Unit):Boolean =
-        deliverMissedReminderBatch({it.forEach(notify)},100)
 }

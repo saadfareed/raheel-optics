@@ -22,6 +22,21 @@ rootProject.file(".env").takeIf { it.isFile }?.readLines()?.forEach { line ->
         dotenv[key.trim()] = raw.trim().removeSurrounding("\"").removeSurrounding("'")
     }
 }
+// Firebase Crashlytics is configured by app/google-services.json (Firebase console > Project settings > Your apps; git-ignored).
+// It is applied when the real app id (pk.raheeloptics.orders) is registered there. The ".qa" and ".perf" test builds need no
+// Firebase app: their Google Services step is skipped and they report nothing. Without the file, nothing changes.
+val firebaseConfig = file("google-services.json")
+val firebaseReady = firebaseConfig.isFile &&
+    Regex("\"package_name\"\\s*:\\s*\"pk\\.raheeloptics\\.orders\"").containsMatchIn(firebaseConfig.readText())
+if (firebaseReady) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+    tasks.configureEach {
+        if ((name.contains("Crashlytics") || name.contains("GoogleServices")) && (name.contains("Qa") || name.contains("Perf"))) enabled = false
+    }
+} else if (firebaseConfig.isFile) {
+    logger.warn("Crashlytics is OFF: google-services.json does not register pk.raheeloptics.orders.")
+}
 android {
     namespace = "com.daymark.todo"
     compileSdk = 37
@@ -42,7 +57,6 @@ android {
         versionName = "1.5.1"
         fun setting(name: String) = providers.gradleProperty(name).orElse(providers.environmentVariable(name)).getOrElse(dotenv[name] ?: cloudDefaults.getProperty(name, ""))
         buildConfigField("String", "SUPABASE_URL", "\"${setting("SUPABASE_URL").replace("\\", "\\\\").replace("\"", "\\\"")}\"")
-        buildConfigField("String", "SENTRY_DSN", "\"${setting("SENTRY_DSN").replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("String", "SUPABASE_PUBLIC_KEY", "\"${setting("SUPABASE_PUBLIC_KEY").replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("String", "SUPPORT_EMAIL", "\"${setting("RELEASE_SUPPORT_EMAIL").replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("String", "PRIVACY_POLICY_URL", "\"${setting("RELEASE_PRIVACY_URL").replace("\\", "\\\\").replace("\"", "\\\"")}\"")
@@ -55,6 +69,7 @@ android {
             require(value in bounds) { "$name must be in $bounds" }
             buildConfigField("int", name, value.toString())
         }
+        buildConfigField("boolean", "DEMO_DATA", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     sourceSets.getByName("main").res.directories.add(rootProject.file("branding/android-res").absolutePath)
@@ -65,6 +80,18 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    buildTypes {
+        getByName("debug") { buildConfigField("boolean", "DEMO_DATA", "true") }
+        // Side-by-side build for instrumented tests: its own application id and data, so a test run can never touch the
+        // account, orders or settings of the installed app.
+        create("qa") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".qa"
+            matchingFallbacks += "debug"
+            resValue("string", "app_name", "${branding.getProperty("APP_NAME", "App")} QA")
+        }
+    }
+    testBuildType = "qa"
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
@@ -80,7 +107,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("com.squareup.okhttp3:okhttp:5.5.0")
-    implementation("io.sentry:sentry-android:8.61.0")
+    implementation(platform("com.google.firebase:firebase-bom:35.2.0"))
+    implementation("com.google.firebase:firebase-crashlytics")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
@@ -89,6 +117,7 @@ dependencies {
     androidTestImplementation(platform("androidx.compose:compose-bom:2026.09.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+    "qaImplementation"("androidx.compose.ui:ui-test-manifest")
 }
 
 val releaseSetting: (String) -> String = { name ->
@@ -108,6 +137,15 @@ android.buildTypes.getByName("release") {
     isMinifyEnabled = true
     isShrinkResources = true
     proguardFiles(android.getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+}
+// Startup/performance measurement: R8-shrunk like release, debug-signed, installs next to the real app as ".perf".
+android.buildTypes.create("perf") {
+    initWith(android.buildTypes.getByName("release"))
+    applicationIdSuffix = ".perf"
+    signingConfig = android.signingConfigs.getByName("debug")
+    matchingFallbacks += "release"
+    resValue("string", "app_name", "${branding.getProperty("APP_NAME", "App")} Perf")
+    buildConfigField("boolean", "DEMO_DATA", "true")
 }
 val validateReleaseConfiguration = tasks.register("validateReleaseConfiguration") {
     doLast {

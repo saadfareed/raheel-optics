@@ -83,7 +83,7 @@ data class Snapshot(
 )
 
 object Rules {
-    const val MaxTitleLength = 160
+    const val MaxTitleLength = FieldRules.NameMax
     fun countdown(minutes: String, now: Long): Long {
         val value = minutes.toLongOrNull()
         require(value != null && value in 1..99999) { "Use a countdown from 1 to 99,999 minutes." }
@@ -96,9 +96,18 @@ object Rules {
         return if(before) Math.subtractExact(deadline,offset) else Math.addExact(deadline,offset)
     }
     fun validate(todo: Todo, now: Long, checkReminder: Boolean = true, checkDeadline: Boolean = false) {
-        require(todo.title.isNotBlank()) { "Enter the customer's name." }
-        require(todo.title.length <= MaxTitleLength) { "Customer name must be $MaxTitleLength characters or fewer." }
-        require(todo.notes.length <= 4000) { "Notes must be 4,000 characters or fewer." }
+        FieldRules.name(todo.title)?.let {require(false) {it}}
+        FieldRules.notes(todo.notes)?.let {require(false) {it}}
+        FieldRules.text(todo.frame.brand,"Frame brand",FieldRules.DetailMax)?.let {require(false) {it}}
+        FieldRules.text(todo.frame.model,"Frame model",FieldRules.DetailMax)?.let {require(false) {it}}
+        FieldRules.text(todo.lens.coating,"Lens coating",FieldRules.CoatingMax)?.let {require(false) {it}}
+        FieldRules.pd(todo.prescription.pd.orEmpty())?.let {require(false) {it}}
+        FieldRules.add(todo.prescription.addRight.orEmpty(),"ADD OD")?.let {require(false) {it}}
+        FieldRules.add(todo.prescription.addLeft.orEmpty(),"ADD OS")?.let {require(false) {it}}
+        require(todo.amounts.run {listOf(framePaisa,lensPaisa,extrasPaisa,discountPaisa,taxPaisa).all {it>=0}}) {"Amounts cannot be negative."}
+        require(todo.amounts.run {listOf(framePaisa,lensPaisa,extrasPaisa,discountPaisa,taxPaisa).all {it<=FieldRules.MaxAmountPaisa}}) {"An amount is too large."}
+        FieldRules.discount(todo.amounts.discountPaisa,todo.amounts.run {framePaisa+lensPaisa+extrasPaisa+taxPaisa})?.let {require(false) {it}}
+        require(todo.payments.sumOf {it.amountPaisa} in 0..todo.amounts.totalPaisa) {"Payments must be between zero and the order total."}
         require(todo.priority in listOf("Low", "Medium", "High")) { "Choose a valid priority." }
         if (checkDeadline) require(todo.dueAt == null || todo.dueAt > now) { "Choose a deadline in the future." }
         if (checkReminder) require(todo.reminderAt == null || todo.reminderAt > now) { "Choose a future reminder time." }

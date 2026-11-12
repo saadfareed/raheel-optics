@@ -55,13 +55,14 @@ class MailTests(unittest.TestCase):
             connection.starttls.assert_called_once()
             connection.login.assert_called_once_with(env['SMTP_USER'], 'test')
             message = connection.send_message.call_args.args[0]
-            self.assertEqual(message['From'], 'Daymark <pakistanbakeries@gmail.com>')
+            self.assertEqual(message['From'], 'Raheel Optics <pakistanbakeries@gmail.com>')
 
     def test_security_notifications_do_not_require_tokens(self):
         for action in ['password_changed', 'email_changed', 'phone_changed', 'identity_linked', 'identity_unlinked', 'mfa_factor_enrolled', 'mfa_factor_unenrolled']:
             payload = {'user': {'email': 'user@example.com'}, 'email_data': {'email_action_type': action + '_notification'}}
             result = messages(payload, 'https://daymark.example/auth-email.html')
-            self.assertIn('Daymark', result[0][1])
+            self.assertIn('Raheel Optics', result[0][1])
+            self.assertNotIn('Daymark', result[0][1])
             self.assertNotIn('token_hash', result[0][2])
 
     def test_reauthentication_and_invalid_actions(self):
@@ -70,6 +71,16 @@ class MailTests(unittest.TestCase):
         payload['email_data']['email_action_type'] = 'unknown'
         with self.assertRaises(ValueError):
             messages(payload, 'https://daymark.example/auth-email.html')
+
+
+    def test_brand_and_support_address_come_from_environment(self):
+        payload = {'user': {'email': 'user@example.com'}, 'email_data': {'email_action_type': 'recovery', 'token_hash': 'abc'}}
+        with patch.dict('os.environ', {'MAIL_BRAND_NAME': 'Test Shop', 'MAIL_REPLY_TO': 'help@shop.example'}, clear=False):
+            _, subject, body = messages(payload, 'https://shop.example/auth-email.html')[0]
+        self.assertEqual(subject, 'Reset your Test Shop password')
+        self.assertIn('Test Shop support: help@shop.example', body)
+        self.assertNotIn('pakistanbakeries', body)
+        self.assertNotIn('Daymark', body)
 
 
 if __name__ == '__main__':

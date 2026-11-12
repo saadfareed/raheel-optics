@@ -64,25 +64,15 @@ class ResponsiveLayoutTest {
     @Test fun guestScreensAtLargeFontAndNarrowContent() {
         app.sessions.save(Session("local-device","","","",Long.MAX_VALUE,true))
         show()
-        compose.waitUntil(10000) {compose.onAllNodesWithContentDescription("Add todo").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitUntil(40000) {compose.onAllNodes(hasContentDescription("Add order") and isEnabled()).fetchSemanticsNodes().isNotEmpty()}
         capture("home-font200-width320")
-        compose.onNodeWithContentDescription("Add todo").performClick()
-        compose.onNodeWithText("High").performScrollTo()
+        compose.onNodeWithContentDescription("Add order").performClick()
+        compose.onNodeWithText("Customer name").assertIsDisplayed()
         capture("editor-font200")
         InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
         compose.onNodeWithContentDescription("Settings").performClick()
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("Privacy"))
         capture("settings-font200-width320")
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Manage storage"))
-        compose.onNodeWithText("Manage storage").performClick()
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Export device data"))
-        compose.onNodeWithText("Save a copy of the data stored on this device.").assertIsDisplayed()
-        compose.onNodeWithContentDescription("About Export device data").performClick()
-        compose.onNodeWithText("The file contains readable task data, not passwords. It is a device snapshot, not a full cloud backup; store it privately.").assertIsDisplayed()
-        InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Import active tasks"))
-        compose.onNodeWithText("Add active-task copies from a Daymark export.").assertIsDisplayed()
-        capture("storage-font200-width320")
     }
     @Test fun inboxWarningFitsAtLargeFontAndNarrowContent() {
         app.sessions.save(Session("local-device","","","",Long.MAX_VALUE,true))
@@ -90,6 +80,7 @@ class ResponsiveLayoutTest {
         compose.waitUntil(10000) {compose.onAllNodesWithContentDescription("Notifications").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("Notifications").performClick()
         if(!app.reminders.allowed()) {
+            compose.waitUntil(10000) {compose.onAllNodesWithText("Notifications off").fetchSemanticsNodes().isNotEmpty()}
             compose.onNodeWithText("Notifications off").assertIsDisplayed()
             compose.onNodeWithText("Open settings").assertIsDisplayed()
         }

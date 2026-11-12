@@ -28,12 +28,12 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun OnboardingScreen(busy:Boolean,error:String?,onFinish:()->Unit) {
     var page by rememberSaveable {mutableIntStateOf(0)}
-    val titles=listOf("Every order, clearly recorded","Never miss a promised date","Know when glasses are ready")
-    val details=listOf("Save the customer, frame, payment and both-eye prescription together.","Set a promised-ready time and choose when the shop should be reminded.","Swipe an order to Ready, notify the customer on WhatsApp, then mark it Complete.")
+    val titles=listOf("Every order in one place","Promised dates, never missed","Ready, invoiced, delivered")
+    val details=listOf("Customer, both-eye prescription, frame and payment are saved together. Order numbers are created for you.","Set when the glasses are promised and get a reminder before the customer arrives.","Mark an order Ready, send the customer a WhatsApp invoice with their dues, then complete it on pickup.")
     BackHandler(enabled=page>0) {if(!busy) page--}
     Surface(color=MaterialTheme.colorScheme.background,modifier=Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(horizontal=Ui.Gutter,vertical=Ui.Tight),verticalAlignment=Alignment.CenterVertically) {
                 androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.daymark.todo.R.drawable.raheel_optics_logo),null,Modifier.size(44.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(androidx.compose.ui.res.stringResource(com.daymark.todo.R.string.app_name),Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
@@ -51,7 +51,7 @@ fun OnboardingScreen(busy:Boolean,error:String?,onFinish:()->Unit) {
                     OnboardingCopy(page,titles[page],details[page])
                 }
             }
-            Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(16.dp),horizontalAlignment=Alignment.CenterHorizontally) {
+            Column(Modifier.fillMaxWidth().padding(horizontal=Ui.Section,vertical=Ui.Gutter),verticalArrangement=Arrangement.spacedBy(Ui.Item),horizontalAlignment=Alignment.CenterHorizontally) {
                 Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                     repeat(3) {index ->
                         Box(Modifier.size(48.dp).clip(CircleShape).clickable(enabled=!busy) {page=index}
@@ -62,8 +62,8 @@ fun OnboardingScreen(busy:Boolean,error:String?,onFinish:()->Unit) {
                 }
                 error?.let {Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                 Row(Modifier.widthIn(max=460.dp).fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                    if(page>0) OutlinedButton(onClick={page--},enabled=!busy,modifier=Modifier.heightIn(min=52.dp)) {Text("Back")}
-                    Button(onClick={if(page==2) onFinish() else page++},enabled=!busy,modifier=Modifier.weight(1f).heightIn(min=52.dp),shape=RoundedCornerShape(18.dp)) {
+                    if(page>0) OutlinedButton(onClick={page--},enabled=!busy,shape=Ui.Field,modifier=Modifier.heightIn(min=52.dp)) {Text("Back")}
+                    Button(onClick={if(page==2) onFinish() else page++},enabled=!busy,modifier=Modifier.weight(1f).heightIn(min=52.dp),shape=Ui.Field) {
                         if(busy) {DaymarkLoader(Modifier.size(20.dp),MaterialTheme.colorScheme.onPrimary,"Saving introduction");Spacer(Modifier.width(12.dp))}
                         Text(if(page==2) "Let's begin" else "Next")
                     }
