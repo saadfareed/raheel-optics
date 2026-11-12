@@ -20,5 +20,5 @@ Server-side only: the mail webhook can still signal errors to Sentry through `SE
 
 ## Next
 1. Apply migrations, then sign in on two phones and check orders, payments and statuses match (device gate + manual).
-2. Rename (last): package `com.daymark.todo`, local DB prefix `todos-` (with on-device file migration), `Todo` model.
+2. Rename (last): package `pk.raheeloptics.orders`, local DB prefix `todos-` (with on-device file migration), `Todo` model.
 3. Frame photo upload to the private `optical-frames` bucket (photos are device-local today).

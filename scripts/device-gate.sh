@@ -67,7 +67,7 @@ adb shell dumpsys gfxinfo "$APP" > "$RUN/gfxinfo.txt" || true
 grep -E "Total frames|Janky frames|90th|95th|99th" "$RUN/gfxinfo.txt" | tee -a "$RUN/gate.log" || true
 
 if [ "${1:-}" = "--manual-pause" ]; then
-  adb shell am start -n "$APP/com.daymark.todo.MainActivity" >/dev/null
+  adb shell am start -n "$APP/pk.raheeloptics.orders.MainActivity" >/dev/null
   read -rp "Run the manual acceptance cycle on the phone, then press Enter to capture evidence… "
   adb exec-out screencap -p > "$RUN/manual-final.png"; adb logcat -d -v time > "$RUN/manual-logcat.txt"
 fi

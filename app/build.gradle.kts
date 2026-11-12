@@ -38,7 +38,7 @@ if (firebaseReady) {
     logger.warn("Crashlytics is OFF: google-services.json does not register pk.raheeloptics.orders.")
 }
 android {
-    namespace = "com.daymark.todo"
+    namespace = "pk.raheeloptics.orders"
     compileSdk = 37
     ndkVersion = "28.2.13676358"
     splits {
