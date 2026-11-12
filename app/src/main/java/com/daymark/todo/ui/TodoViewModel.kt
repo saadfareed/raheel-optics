@@ -25,6 +25,9 @@ data class UiState(
     val busy: Boolean = false,
     val loading: Boolean = true,
     val message: String? = null,
+    /** Email waiting for a 6-digit code; [codeIsReset] means a password reset rather than sign-up. */
+    val codeEmail: String? = null,
+    val codeIsReset: Boolean = false,
     val online: Boolean = false,
     val syncProblem: String? = null,
     val lastSync: String? = null,
@@ -324,9 +327,20 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
     fun login(email:String,password:String)=action { app.auth.login(email,password); attach() }
     fun register(email:String,password:String)=action {
         if(app.auth.register(email,password)) attach()
-        else mutable.update { it.copy(message="Confirm your email, then sign in.") }
+        else mutable.update { it.copy(codeEmail=email.trim(),codeIsReset=false,message="We emailed a 6-digit code to ${email.trim()}.") }
     }
-    fun reset(email:String)=action { app.auth.reset(email); mutable.update { it.copy(message="If an account exists for this email, you’ll receive a reset link.") } }
+    fun reset(email:String)=action { app.auth.reset(email); mutable.update { it.copy(codeEmail=email.trim(),codeIsReset=true,message="If an account exists for this email, we sent it a 6-digit code.") } }
+    fun verifyCode(code:String,newPassword:String?)=action {
+        val pending=state.value
+        app.auth.verifyCode(pending.codeEmail ?: error("Start again."),code.trim(),if(pending.codeIsReset) "recovery" else "signup",newPassword)
+        mutable.update { it.copy(codeEmail=null,message=null) }; attach()
+    }
+    fun resendCode()=action {
+        val pending=state.value; val email=pending.codeEmail ?: return@action
+        if(pending.codeIsReset) app.auth.reset(email) else app.auth.resendSignupCode(email)
+        mutable.update { it.copy(message="A new code is on its way.") }
+    }
+    fun cancelCode()=mutable.update { it.copy(codeEmail=null,message=null) }
     fun changePassword(current:String,replacement:String,onChanged:()->Unit)=action {
         app.auth.changePassword(current,replacement)
         mutable.update { it.copy(message="Password updated.") }; onChanged()

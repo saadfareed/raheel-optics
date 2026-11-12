@@ -291,6 +291,8 @@ private fun BottomNavigation(tab:String,onSelect:(String)->Unit,onAdd:()->Unit,d
 }
 
 @Composable private fun Message(text:String,dismiss:()->Unit) {
+    val currentDismiss by rememberUpdatedState(dismiss)
+    LaunchedEffect(text) {kotlinx.coroutines.delay(5000);currentDismiss()}
     Surface(color=MaterialTheme.colorScheme.secondaryContainer,shape=RoundedCornerShape(16.dp),modifier=Modifier.padding(horizontal=20.dp,vertical=8.dp)) {
         Row(Modifier.padding(start=14.dp),verticalAlignment=Alignment.CenterVertically) {
             Text(text,Modifier.weight(1f).semantics {liveRegion=LiveRegionMode.Polite},style=MaterialTheme.typography.bodySmall)
@@ -832,6 +834,10 @@ private fun storageLabel(bytes:Long):String=if(bytes<1024*1024) "${bytes/1024} K
 
 @Composable private fun AccountScreen(state:UiState,model:TodoViewModel) {
     var forgot by rememberSaveable {mutableStateOf(false)}
+    if(state.codeEmail!=null) {
+        EmailCodeScreen(state,model)
+        return
+    }
     if(forgot) {
         ForgotPasswordScreen(state,model) {model.dismissMessage();forgot=false}
         return
@@ -1163,6 +1169,30 @@ fun SplashScreen() {
 }
 
 @Composable
+private fun EmailCodeScreen(state:UiState,model:TodoViewModel) {
+    var code by rememberSaveable {mutableStateOf("")}
+    var password by remember {mutableStateOf("")}
+    val reset=state.codeIsReset
+    androidx.activity.compose.BackHandler {if(!state.busy) model.cancelCode()}
+    Surface(color=Paper,modifier=Modifier.fillMaxSize()) {
+        LazyColumn(modifier=Modifier.safeDrawingPadding().imePadding(),contentPadding=PaddingValues(28.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
+            item {TextButton(onClick=model::cancelCode,enabled=!state.busy) {Text("Back")}}
+            item {BrandLogo(Modifier.size(64.dp))}
+            item {Text(if(reset) "Reset password" else "Confirm your email",fontWeight=FontWeight.Bold,style=MaterialTheme.typography.headlineLarge)}
+            item {Text("Enter the 6-digit code we sent to ${state.codeEmail}.",color=Muted)}
+            state.message?.let {item {Message(it,model::dismissMessage)}}
+            item {OutlinedTextField(code,{code=it.filter(Char::isDigit).take(10)},label={Text("Code")},singleLine=true,enabled=!state.busy,
+                keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword),modifier=Modifier.fillMaxWidth().testTag("email-code"))}
+            if(reset) item {OutlinedTextField(password,{password=it},label={Text("New password (12+ characters)")},singleLine=true,enabled=!state.busy,
+                visualTransformation=androidx.compose.ui.text.input.PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),modifier=Modifier.fillMaxWidth())}
+            item {Button(onClick={model.verifyCode(code,if(reset) password else null)},enabled=!state.busy && code.length>=6 && (!reset || password.length>=12),
+                modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)) {Text(if(state.busy) "Checking…" else if(reset) "Set password and sign in" else "Confirm and sign in")}}
+            item {TextButton(onClick=model::resendCode,enabled=!state.busy) {Text("Send a new code")}}
+        }
+    }
+}
+
+@Composable
 private fun ForgotPasswordScreen(state:UiState,model:TodoViewModel,back:()->Unit) {
     var email by rememberSaveable {mutableStateOf("")}
     androidx.activity.compose.BackHandler {if(!state.busy) back()}
@@ -1174,7 +1204,7 @@ private fun ForgotPasswordScreen(state:UiState,model:TodoViewModel,back:()->Unit
             item {Text("Enter your account email. We’ll send you a link to reset your password.",color=Muted)}
             state.message?.let {item {Message(it,model::dismissMessage)}}
             item {OutlinedTextField(email,{email=it},label={Text("Email")},singleLine=true,enabled=!state.busy,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email),modifier=Modifier.fillMaxWidth())}
-            item {Button(onClick={model.reset(email)},enabled=!state.busy && state.config.configured && android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches(),modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)) {Text(if(state.busy) "Sending…" else "Send reset link")}}
+            item {Button(onClick={model.reset(email)},enabled=!state.busy && state.config.configured && android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches(),modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)) {Text(if(state.busy) "Sending…" else "Email me a code")}}
             if(!state.config.configured) item {Text("Service is being set up. Please try again later.",color=Muted)}
         }
     }

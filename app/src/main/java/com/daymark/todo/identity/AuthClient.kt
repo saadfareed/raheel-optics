@@ -30,6 +30,18 @@ class AuthClient(private val sessions: AuthSessionStorage, private val transport
         val response = request("/auth/v1/signup", body = buildJsonObject { put("email", email.trim()); put("password", password) }).jsonObject
         return if (response["access_token"]?.jsonPrimitive?.contentOrNull != null) { sessions.clear(); saveResponse(response); sessions.markOpened(); true } else false
     }
+    /** Confirms a 6-digit email code ([type] "signup" or "recovery") and signs in; recovery then sets [newPassword]. */
+    suspend fun verifyCode(email: String, code: String, type: String, newPassword: String? = null) {
+        require(code.length in 6..10 && code.all(Char::isDigit)) { "Enter the code from the email." }
+        if (newPassword != null) require(newPassword.length >= 12) { "Use a password of at least 12 characters." }
+        val response = request("/auth/v1/verify", body = buildJsonObject { put("type", type); put("email", email.trim()); put("token", code) }).jsonObject
+        sessions.clear(); saveResponse(response)
+        if (newPassword != null) requestWithToken("/auth/v1/user", "PUT", buildJsonObject { put("password", newPassword) }, response["access_token"]!!.jsonPrimitive.content)
+        sessions.markOpened()
+    }
+    suspend fun resendSignupCode(email: String) {
+        request("/auth/v1/resend", body = buildJsonObject { put("type", "signup"); put("email", email.trim()) })
+    }
     suspend fun reset(email: String) {
         require(email.contains("@")) { "Enter your email address." }
         request("/auth/v1/recover", body = buildJsonObject { put("email", email.trim()) })
