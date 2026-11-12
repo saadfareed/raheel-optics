@@ -199,10 +199,13 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         val session=app.sessions.session()
         app.sessions.markOpened()
         mutable.update { UiState(session,app.sessions.config(),busy=it.busy,loading=session!=null,sessionIdleDays=app.sessions.idleDays(),message=if(expired) "Sign in again. Your local changes are safe." else null) }
-        store=app.workspace()
+        val started=android.os.SystemClock.elapsedRealtime()
+        fun phase(name:String) = android.util.Log.i("RaheelStartup","$name +${android.os.SystemClock.elapsedRealtime()-started}ms")
+        store=app.workspace(); phase("workspace opened")
         val workspace=store ?: run { mutable.update { it.copy(loading=false) }; return }
-        workspace.reconcile()
-        app.refreshReminders(); refresh()
+        withContext(Dispatchers.Default) {workspace.reconcile()}; phase("reconciled")
+        refresh(); phase("first orders page")
+        withContext(Dispatchers.Default) {app.refreshReminders()}; phase("reminders scheduled")
         observers=viewModelScope.launch {
             launch {
                 workspace.db.onChange(setOf("active_todos","server_todos","server_totals","drafts","journal","history_cache","user_totals","local_totals","quarantined_changes","optical_drafts","optical_customer_cache","optical_journal"))
@@ -243,7 +246,8 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         if(store===workspace) mutable.update {it.copy(snapshot=it.snapshot.copy(inbox=inbox))}
     }
 
-    private suspend fun refresh() = refreshLock.withLock {
+    /** Off the main thread: decoding a page of orders froze the first frames. */
+    private suspend fun refresh() = withContext(Dispatchers.Default) { refreshLock.withLock {
         val workspace=store ?: return@withLock
         val query=mutable.value.query
         val limit=todoLimit
@@ -266,7 +270,7 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
                 customerConflicts=customerConflicts,
                 conflictPageNumber=conflictOffset/ListRules.PageSize+1)
         }
-    }
+    }}
 
     private fun action(block: suspend ()->Unit) {
         if(mutable.value.busy) return

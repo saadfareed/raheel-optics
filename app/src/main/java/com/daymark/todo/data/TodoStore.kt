@@ -680,7 +680,6 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
                 for ((id,size) in cache) {bytes+=size;if(bytes>cachePolicy.bytes) tx.execute("DELETE FROM history_cache WHERE id=?",listOf(id))}
             }
             if(!localOnly) tx.execute("DELETE FROM server_todos WHERE json_extract(body,'$.status')<>'active' AND id NOT IN (SELECT id FROM active_todos UNION SELECT id FROM drafts UNION SELECT json_extract(body,'$.todo.id') FROM history_cache UNION SELECT json_extract(payload,'$.todo.id') FROM journal)")
-            tx.execute("DELETE FROM analytics_cache WHERE id NOT IN (SELECT id FROM analytics_cache ORDER BY id DESC LIMIT 4)")
             tx.execute("WITH effective AS ($effectiveTodos) DELETE FROM deadline_receipts WHERE id NOT IN (SELECT id FROM inbox) AND NOT EXISTS (SELECT 1 FROM effective WHERE effective.id=deadline_receipts.todo_id AND json_extract(body,'$.status')='active' AND json_extract(body,'$.dueAt')=deadline_receipts.deadline_at)")
             tx.execute("WITH effective AS ($effectiveTodos) DELETE FROM reminder_receipts WHERE id NOT IN (SELECT id FROM inbox) AND NOT EXISTS (SELECT 1 FROM effective WHERE effective.id=reminder_receipts.todo_id AND json_extract(body,'$.status')='active' AND json_extract(body,'$.reminderAt')=reminder_receipts.reminder_at)")
             tx.execute("DELETE FROM inbox WHERE id NOT IN (SELECT id FROM inbox ORDER BY time DESC LIMIT 100)")

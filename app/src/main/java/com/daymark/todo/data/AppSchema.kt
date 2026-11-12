@@ -14,7 +14,6 @@ val appSchema = Schema(listOf(
     Table.localOnly("upload_pause", listOf(Column.text("body"))),
     Table.localOnly("import_receipts", listOf(Column.integer("created_at"))),
     Table.localOnly("resource_limits", listOf(Column.text("body"), Column.integer("received_at"))),
-    Table.localOnly("analytics_cache", listOf(Column.text("body"))),
     Table.localOnly("sync_checkpoint", listOf(Column.integer("revision"), Column.text("todo_id"))),
     Table.localOnly("drafts", listOf(Column.text("body"), Column.text("operation_id"))),
     Table.localOnly("local_totals", listOf(Column.integer("active"), Column.integer("completed"), Column.integer("deleted"), Column.integer("revision"))),
@@ -28,7 +27,6 @@ val appSchema = Schema(listOf(
     Table.localOnly("optical_customer_cache",listOf(Column.text("body"))),
     Table("optical_orders", listOf(Column.text("customer_id"), Column.text("order_number"), Column.text("status"), Column.text("prescription"), Column.text("frame"), Column.text("lens"), Column.integer("frame_paisa"), Column.integer("lens_paisa"), Column.integer("extras_paisa"), Column.integer("discount_paisa"), Column.integer("tax_paisa"), Column.integer("total_paisa"), Column.integer("ordered_at"), Column.integer("promised_at"), Column.integer("reminder_at"), Column.integer("delivered_at"), Column.text("notes"), Column.integer("revision"), Column.integer("updated_at"))),
     Table("optical_payments", listOf(Column.text("order_id"), Column.integer("amount_paisa"), Column.text("method"), Column.integer("received_at"), Column.text("note"), Column.integer("created_at"))),
-    Table("optical_order_events", listOf(Column.text("order_id"), Column.text("event_type"), Column.integer("occurred_at"), Column.text("payload"))),
     Table.localOnly("optical_drafts", listOf(Column.text("body"), Column.text("operation_id"))),
     Table.localOnly("optical_journal", listOf(Column.text("payload"), Column.text("state"), Column.integer("ack_revision"), Column.text("message"), Column.integer("created_at"))),
 ))
