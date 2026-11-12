@@ -61,7 +61,7 @@ class HistoryPaginationTest {
         compose.runOnUiThread {model.updateQuery(model.state.value.query.copy(search="Task "))}
         val page=ListRules.PageSize
         runBlocking {repeat(2*page+5) {i -> app.workspace()!!.save(Order("$account-active-$i","Task $i",notes="x".repeat(4000)),"create",null)}}
-        compose.waitUntil(10000) {model.state.value.todos.size==page && model.state.value.todosMore}
+        compose.waitUntil(10000) {model.state.value.todos.size==page && model.state.value.todosMore && model.state.value.todos.first().id.endsWith("-active-${2*page+4}")}
         val first=model.state.value.todos.map {it.id}
         compose.runOnUiThread {model.loadMoreTodos()}
         compose.waitUntil(10000) {model.state.value.todos.size==2*page && !model.state.value.todosLoading}
