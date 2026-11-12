@@ -47,9 +47,9 @@ class OpticalRepairStoreTest {
             }
             val first=store.todoPage(TodoQuery(sort=TodoSort.CustomerName))
             val second=store.todoPage(TodoQuery(sort=TodoSort.CustomerName),first.next)
-            assertEquals(25,first.items.size);assertEquals(5,second.items.size)
+            assertEquals(ListRules.PageSize,first.items.size);assertEquals(ListRules.PageSize,second.items.size)
             assertEquals("Customer 00",first.items.first().title)
-            assertEquals("Customer 25",second.items.first().title)
+            assertEquals("Customer ${ListRules.PageSize}",second.items.first().title)
             assertEquals("Customer 29",store.todoPage(TodoQuery(sort=TodoSort.Balance)).items.first().title)
             val original=first.items.first()
             store.transition(original,"complete")

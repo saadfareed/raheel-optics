@@ -59,15 +59,16 @@ class HistoryPaginationTest {
         compose.waitUntil(10000) {!model.state.value.loading && !model.state.value.busy}
         // Only this test's own orders count, whatever else the shared test data holds (for example demo orders).
         compose.runOnUiThread {model.updateQuery(model.state.value.query.copy(search="Task "))}
-        runBlocking {repeat(55) {i -> app.workspace()!!.save(Todo("$account-active-$i","Task $i",notes="x".repeat(4000)),"create",null)}}
-        compose.waitUntil(10000) {model.state.value.todos.size==25 && model.state.value.todosMore}
+        val page=ListRules.PageSize
+        runBlocking {repeat(2*page+5) {i -> app.workspace()!!.save(Todo("$account-active-$i","Task $i",notes="x".repeat(4000)),"create",null)}}
+        compose.waitUntil(10000) {model.state.value.todos.size==page && model.state.value.todosMore}
         val first=model.state.value.todos.map {it.id}
         compose.runOnUiThread {model.loadMoreTodos()}
-        compose.waitUntil(10000) {model.state.value.todos.size==50 && !model.state.value.todosLoading}
-        assertEquals("earlier rows keep their order",first,model.state.value.todos.take(25).map {it.id})
-        assertEquals(50,model.state.value.todos.map {it.id}.toSet().size)
+        compose.waitUntil(10000) {model.state.value.todos.size==2*page && !model.state.value.todosLoading}
+        assertEquals("earlier rows keep their order",first,model.state.value.todos.take(page).map {it.id})
+        assertEquals(2*page,model.state.value.todos.map {it.id}.toSet().size)
         compose.runOnUiThread {model.loadMoreTodos()}
-        compose.waitUntil(10000) {model.state.value.todos.size>=55 && !model.state.value.todosLoading}
+        compose.waitUntil(10000) {model.state.value.todos.size>=2*page+5 && !model.state.value.todosLoading}
         assertFalse("everything loaded",model.state.value.todosMore)
         compose.runOnUiThread {model.updateQuery(model.state.value.query.copy(search="Task 1"))}
         compose.waitUntil(10000) {model.state.value.todos.size<50 && !model.state.value.todosLoading}
