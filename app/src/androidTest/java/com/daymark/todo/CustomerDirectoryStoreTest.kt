@@ -31,7 +31,6 @@ class CustomerDirectoryStoreTest {
             assertEquals("-27.00",rows.first().latestOrder.prescription.distanceRight.sphere)
             assertEquals(1,store.customerDirectory(CustomerDirectoryQuery(search="0300 123-4567")).size)
             assertEquals(1,store.customerDirectory(CustomerDirectoryQuery(search="+92 (300) 1234567")).size)
-            assertEquals(1,store.customerDirectory(CustomerDirectoryQuery(outstandingOnly=true)).size)
             assertEquals("Zain",store.customerDirectory(CustomerDirectoryQuery(sort=CustomerSort.NAME_DESC)).first().latestOrder.title)
             assertTrue(store.customerDirectory(CustomerDirectoryQuery(search="%_")).isEmpty())
         } finally {db.close();context.deleteDatabase(filename)}

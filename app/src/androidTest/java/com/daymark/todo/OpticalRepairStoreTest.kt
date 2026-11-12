@@ -65,7 +65,7 @@ class OpticalRepairStoreTest {
             val export=StringBuilder();store.exportTo(export,OpticalExportSelection.ACTIVE_ORDERS)
             val preview=TaskImport.preview(export.toString().byteInputStream())
             assertEquals(29,preview.activeTasks.size)
-            val directory=store.customerDirectory(CustomerDirectoryQuery(returning=true))
+            val directory=store.customerDirectory(CustomerDirectoryQuery())
             assertEquals(1,directory.size);assertEquals(30,directory.single().orderCount)
         } finally {db.close();context.deleteDatabase(filename)}
     }

@@ -66,7 +66,6 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
     private fun customerDraft(json: String): Customer = this.json.decodeFromString<Customer>(json)
     private fun orderDraft(json: String): OpticalOrder = this.json.decodeFromString<OpticalOrder>(json)
     private fun encodeCustomerDraft(customer: Customer): String = encodeKinded("customer", json.encodeToString(customer))
-    private fun encodeOrderDraft(order: OpticalOrder): String = encodeKinded("order", json.encodeToString(order))
     private fun encodeKinded(kind: String, body: String): String =
         buildString { append("{\"kind\":\""); append(kind); append("\","); append(body.trimStart().removePrefix("{")) }
 
@@ -110,9 +109,6 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
 
     /** True when this op id was already queued; the whole operation then replays as a no-op (optical_journal is the
      *  locally-queryable idempotency ledger — operation_requests is an insert-only CRUD table, not readable back). */
-    private fun alreadyApplied(tx: com.powersync.db.internal.PowerSyncTransaction, opId: String): Boolean =
-        tx.getOptional("SELECT id FROM optical_journal WHERE id=?", listOf(opId)) { it.getString(0)!! } != null
-
     private fun writeOp(tx: com.powersync.db.internal.PowerSyncTransaction, op: OpticalOperation) {
         val payload = json.encodeToString(op)
         tx.execute("INSERT INTO optical_journal(id,payload,state,ack_revision,message,created_at) VALUES(?,?,?,0,'',?)", listOf(op.id,payload,if(localOnly) "local" else "queued",op.occurredAt))
@@ -125,24 +121,6 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
     private fun writeCustomerDraft(tx: com.powersync.db.internal.PowerSyncTransaction, customer: Customer, opId: String) {
         tx.execute("INSERT OR REPLACE INTO optical_drafts(id,body,operation_id) VALUES(?,?,?)", listOf(customer.id, encodeCustomerDraft(customer), opId))
     }
-
-    private fun writeOrderDraft(tx: com.powersync.db.internal.PowerSyncTransaction, order: OpticalOrder, opId: String) {
-        tx.execute("INSERT OR REPLACE INTO optical_drafts(id,body,operation_id) VALUES(?,?,?)", listOf(order.id, encodeOrderDraft(order), opId))
-    }
-
-    private fun writeEvent(tx: com.powersync.db.internal.PowerSyncTransaction, opId: String, orderId: String, eventType: String, occurredAt: Long, payload: Map<String, Any?>) {
-        tx.execute("INSERT OR IGNORE INTO optical_order_events(id,order_id,event_type,occurred_at,payload) VALUES(?,?,?,?,?)",
-            listOf(opId, orderId, eventType, occurredAt, jsonObject(payload)))
-    }
-
-    private fun jsonObject(values: Map<String, Any?>): String = JsonObject(values.mapValues { (_, v) ->
-        when (v) {
-            null -> JsonPrimitive(null as String?)
-            is Number -> JsonPrimitive(v)
-            is Boolean -> JsonPrimitive(v)
-            else -> JsonPrimitive(v.toString())
-        }
-    }).toString()
 
     /**
      * Resolves identity by (account, normalizedMobile). On [upsertCustomer] (reuse=false) a number that already
@@ -223,186 +201,8 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
         upsertCustomerInTransaction(tx,customer.copy(revision=remote?.revision ?: 0,createdAt=remote?.createdAt ?: customer.createdAt,previousMobiles=remote?.previousMobiles.orEmpty()))
     }
 
-    suspend fun createOrder(order: OpticalOrder): OpticalOrder {
-        OpticalRules.validate(order)
-        val now = System.currentTimeMillis()
-        return write { tx ->
-            admit(tx, OpticalActions.ORDER_CREATE)
-            // Atomically upsert the customer (reusing an existing id by normalized mobile) and create the order.
-            val resolved = resolveCustomer(tx, order.customer, now, reuse = true)
-            if (currentCustomer(tx, resolved.id)?.let { it.name != resolved.name || it.mobile != resolved.mobile || it.alternateMobile != resolved.alternateMobile || it.notes != resolved.notes } != false) {
-                val customerOp = OpticalOperation(UUID.randomUUID().toString(), OpticalPayload.CustomerUpsert(resolved), OpticalActions.CUSTOMER_UPSERT,
-                    baseRevision = resolved.revision - 1, previousOperation = previousOp(tx, resolved.id), occurredAt = now)
-                writeOp(tx, customerOp)
-                writeCustomerDraft(tx, resolved, customerOp.id)
-            }
-            val stored = order.copy(customer = resolved, status = order.status, orderedAt = now, updatedAt = now, revision = 1)
-            val op = OpticalOperation(UUID.randomUUID().toString(), OpticalPayload.OrderCreate(stored), OpticalActions.ORDER_CREATE,
-                baseRevision = 0, previousOperation = null, occurredAt = now, beforeStatus = "absent")
-            writeOp(tx, op)
-            writeOrderDraft(tx, stored, op.id)
-            writeEvent(tx, op.id, stored.id, "created", now, mapOf("status" to stored.status.name))
-            stored
-        }
-    }
-
-    suspend fun editOrder(order: OpticalOrder, before: OpticalOrder): OpticalOrder {
-        OpticalRules.validate(order)
-        val now = System.currentTimeMillis()
-        return write { tx ->
-            admit(tx, OpticalActions.ORDER_EDIT)
-            val current = currentOrder(tx, order.id)
-            check(current != null && current.revision == before.revision) { "This order has changed. Open the latest version before editing." }
-            // Edits the order's own body (its own prescription snapshot); never rewrites the customer's shared record.
-            val stored = order.copy(revision = before.revision + 1, updatedAt = now)
-            val op = OpticalOperation(UUID.randomUUID().toString(), OpticalPayload.OrderEdit(stored), OpticalActions.ORDER_EDIT,
-                baseRevision = before.revision, previousOperation = previousOp(tx, order.id), occurredAt = now, beforeStatus = before.status.name)
-            writeOp(tx, op)
-            writeOrderDraft(tx, stored, op.id)
-            writeEvent(tx, op.id, stored.id, "edited", now, emptyMap())
-            stored
-        }
-    }
-
-    suspend fun changeStatus(orderId: String, next: OrderStatus): OpticalOrder {
-        val now = System.currentTimeMillis()
-        return write { tx ->
-            admit(tx, OpticalActions.ORDER_STATUS)
-            val current = currentOrder(tx, orderId) ?: error("This order no longer exists.")
-            val stored = OpticalRules.transition(current, next, now).copy(revision = current.revision + 1)
-            val op = OpticalOperation(UUID.randomUUID().toString(), OpticalPayload.OrderStatusChange(orderId, next, stored.deliveredAt), OpticalActions.ORDER_STATUS,
-                baseRevision = current.revision, previousOperation = previousOp(tx, orderId), occurredAt = now, beforeStatus = current.status.name)
-            writeOp(tx, op)
-            writeOrderDraft(tx, stored, op.id)
-            writeEvent(tx, op.id, orderId, "status_changed", now, mapOf("status" to next.name))
-            stored
-        }
-    }
-
-    suspend fun addPayment(orderId: String, payment: Payment): OpticalOrder {
-        require(payment.amountPaisa > 0) { "Payment must be greater than zero." }
-        val now = System.currentTimeMillis()
-        return write { tx ->
-            admit(tx, OpticalActions.PAYMENT_ADD)
-            val current = currentOrder(tx, orderId) ?: error("This order no longer exists.")
-            require(current.paidPaisa + payment.amountPaisa <= current.amounts.totalPaisa) { "Payments cannot exceed the order total." }
-            // Append-only ledger: payments accumulate, never collapse.
-            val stored = current.copy(payments = current.payments + payment, revision = current.revision + 1, updatedAt = now)
-            val op = OpticalOperation(UUID.randomUUID().toString(), OpticalPayload.PaymentAdd(orderId, payment), OpticalActions.PAYMENT_ADD,
-                baseRevision = current.revision, previousOperation = previousOp(tx, orderId), occurredAt = now, beforeStatus = current.status.name)
-            writeOp(tx, op)
-            writeOrderDraft(tx, stored, op.id)
-            // Synced ledger row the client owns (amount_paisa>0, migration 016); user_id injected by the sync layer.
-            tx.execute("INSERT OR IGNORE INTO optical_payments(id,order_id,amount_paisa,method,received_at,note,created_at) VALUES(?,?,?,?,?,?,?)",
-                listOf(payment.id, orderId, payment.amountPaisa, payment.method.name, payment.receivedAt, payment.note, now))
-            writeEvent(tx, op.id, orderId, "payment_added", now, mapOf("paymentId" to payment.id, "amountPaisa" to payment.amountPaisa))
-            stored
-        }
-    }
-
-    suspend fun refundPayment(orderId: String, payment: Payment): OpticalOrder {
-        require(payment.amountPaisa > 0) { "Refund must be greater than zero." }
-        val now = System.currentTimeMillis()
-        return write { tx ->
-            admit(tx, OpticalActions.PAYMENT_REFUND)
-            val current = currentOrder(tx, orderId) ?: error("This order no longer exists.")
-            require(payment.amountPaisa <= current.paidPaisa) { "Refund cannot exceed the amount paid." }
-            // Append-only ledger: a refund is a distinct negative-amount entry so paidPaisa drops and balancePaisa
-            // rises; the original payment is never deleted. The backend refund row shape is finalized by the sync task
-            // (optical_payments.amount_paisa>0 forbids a negative synced row here), so no synced optical_payments row.
-            val refundEntry = payment.copy(amountPaisa = -payment.amountPaisa)
-            val stored = current.copy(payments = current.payments + refundEntry, revision = current.revision + 1, updatedAt = now)
-            val op = OpticalOperation(UUID.randomUUID().toString(), OpticalPayload.PaymentRefund(orderId, payment), OpticalActions.PAYMENT_REFUND,
-                baseRevision = current.revision, previousOperation = previousOp(tx, orderId), occurredAt = now, beforeStatus = current.status.name)
-            writeOp(tx, op)
-            writeOrderDraft(tx, stored, op.id)
-            writeEvent(tx, op.id, orderId, "payment_refunded", now, mapOf("paymentId" to payment.id, "amountPaisa" to payment.amountPaisa))
-            stored
-        }
-    }
-
-    suspend fun attachImage(orderId: String, imageId: String, objectPath: String, contentType: String, byteSize: Long): OpticalOrder {
-        val now = System.currentTimeMillis()
-        return write { tx ->
-            admit(tx, OpticalActions.IMAGE_ATTACH)
-            val current = currentOrder(tx, orderId) ?: error("This order no longer exists.")
-            // Bookkeeping only; the upload pipeline is a later task.
-            val stored = current.copy(frame = current.frame.copy(imageKey = imageId), revision = current.revision + 1, updatedAt = now)
-            val op = OpticalOperation(UUID.randomUUID().toString(), OpticalPayload.ImageAttach(orderId, imageId, objectPath, contentType, byteSize), OpticalActions.IMAGE_ATTACH,
-                baseRevision = current.revision, previousOperation = previousOp(tx, orderId), occurredAt = now, beforeStatus = current.status.name)
-            writeOp(tx, op)
-            writeOrderDraft(tx, stored, op.id)
-            writeEvent(tx, op.id, orderId, "image_added", now, mapOf("imageId" to imageId, "objectPath" to objectPath, "contentType" to contentType, "byteSize" to byteSize))
-            stored
-        }
-    }
-
-    suspend fun removeImage(orderId: String, imageId: String): OpticalOrder {
-        val now = System.currentTimeMillis()
-        return write { tx ->
-            admit(tx, OpticalActions.IMAGE_REMOVE)
-            val current = currentOrder(tx, orderId) ?: error("This order no longer exists.")
-            val stored = current.copy(frame = if (current.frame.imageKey == imageId) current.frame.copy(imageKey = null) else current.frame, revision = current.revision + 1, updatedAt = now)
-            val op = OpticalOperation(UUID.randomUUID().toString(), OpticalPayload.ImageRemove(orderId, imageId), OpticalActions.IMAGE_REMOVE,
-                baseRevision = current.revision, previousOperation = previousOp(tx, orderId), occurredAt = now, beforeStatus = current.status.name)
-            writeOp(tx, op)
-            writeOrderDraft(tx, stored, op.id)
-            writeEvent(tx, op.id, orderId, "image_removed", now, mapOf("imageId" to imageId))
-            stored
-        }
-    }
-
     private fun previousOp(tx: com.powersync.db.internal.PowerSyncTransaction, entityId: String): String? =
         tx.getOptional("SELECT operation_id FROM optical_drafts WHERE id=?", listOf(entityId)) { it.getString(0)!! }
-
-    /**
-     * Re-drives a previously constructed operation (the replay/sync path). Idempotent on [OpticalOperation.id]:
-     * an op already in the journal is a clean no-op, so replaying it writes no duplicate rows.
-     */
-    suspend fun apply(op: OpticalOperation) {
-        write { tx ->
-            if (alreadyApplied(tx, op.id)) return@write
-            writeOp(tx, op)
-            when (val payload = op.payload) {
-                is OpticalPayload.CustomerUpsert -> writeCustomerDraft(tx, payload.customer, op.id)
-                is OpticalPayload.OrderCreate -> {
-                    writeOrderDraft(tx, payload.order, op.id)
-                    writeEvent(tx, op.id, payload.order.id, "created", op.occurredAt, mapOf("status" to payload.order.status.name))
-                }
-                is OpticalPayload.OrderEdit -> {
-                    writeOrderDraft(tx, payload.order, op.id)
-                    writeEvent(tx, op.id, payload.order.id, "edited", op.occurredAt, emptyMap())
-                }
-                is OpticalPayload.OrderStatusChange -> {
-                    val current = currentOrder(tx, payload.orderId) ?: error("This order no longer exists.")
-                    writeOrderDraft(tx, OpticalRules.transition(current, payload.status, op.occurredAt).copy(revision = current.revision + 1), op.id)
-                    writeEvent(tx, op.id, payload.orderId, "status_changed", op.occurredAt, mapOf("status" to payload.status.name))
-                }
-                is OpticalPayload.PaymentAdd -> {
-                    val current = currentOrder(tx, payload.orderId) ?: error("This order no longer exists.")
-                    writeOrderDraft(tx, current.copy(payments = current.payments + payload.payment, revision = current.revision + 1, updatedAt = op.occurredAt), op.id)
-                    tx.execute("INSERT OR IGNORE INTO optical_payments(id,order_id,amount_paisa,method,received_at,note,created_at) VALUES(?,?,?,?,?,?,?)",
-                        listOf(payload.payment.id, payload.orderId, payload.payment.amountPaisa, payload.payment.method.name, payload.payment.receivedAt, payload.payment.note, op.occurredAt))
-                    writeEvent(tx, op.id, payload.orderId, "payment_added", op.occurredAt, mapOf("paymentId" to payload.payment.id, "amountPaisa" to payload.payment.amountPaisa))
-                }
-                is OpticalPayload.PaymentRefund -> {
-                    val current = currentOrder(tx, payload.orderId) ?: error("This order no longer exists.")
-                    writeOrderDraft(tx, current.copy(payments = current.payments + payload.payment.copy(amountPaisa = -payload.payment.amountPaisa), revision = current.revision + 1, updatedAt = op.occurredAt), op.id)
-                    writeEvent(tx, op.id, payload.orderId, "payment_refunded", op.occurredAt, mapOf("paymentId" to payload.payment.id, "amountPaisa" to payload.payment.amountPaisa))
-                }
-                is OpticalPayload.ImageAttach -> {
-                    val current = currentOrder(tx, payload.orderId) ?: error("This order no longer exists.")
-                    writeOrderDraft(tx, current.copy(frame = current.frame.copy(imageKey = payload.imageId), revision = current.revision + 1, updatedAt = op.occurredAt), op.id)
-                    writeEvent(tx, op.id, payload.orderId, "image_added", op.occurredAt, mapOf("imageId" to payload.imageId, "objectPath" to payload.objectPath, "contentType" to payload.contentType, "byteSize" to payload.byteSize))
-                }
-                is OpticalPayload.ImageRemove -> {
-                    val current = currentOrder(tx, payload.orderId) ?: error("This order no longer exists.")
-                    writeOrderDraft(tx, current.copy(frame = if (current.frame.imageKey == payload.imageId) current.frame.copy(imageKey = null) else current.frame, revision = current.revision + 1, updatedAt = op.occurredAt), op.id)
-                    writeEvent(tx, op.id, payload.orderId, "image_removed", op.occurredAt, mapOf("imageId" to payload.imageId))
-                }
-            }
-        }
-    }
 
     /** Full-dataset read: drafts win over synced rows on id collision; orders expose computed balances. */
     internal suspend fun snapshot(): OpticalSnapshot = withContext(Dispatchers.Default) {

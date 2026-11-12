@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Applies named migrations to the live Supabase database, e.g.  scripts/apply-migrations.sh 020 021 022 023
 # Needs DATABASE_URL (Supabase > Project Settings > Database > Connection string, session pooler or direct) in the
-# environment or in the git-ignored .env. Takes a full backup first, applies each file once (recorded in
+# environment or in the git-ignored .env. Backs up the public schema first (Supabase-managed auth/storage schemas stall pg_dump through the pooler), applies each file once (recorded in
 # public.raheel_migrations), stops at the first error, then verifies the order API.
 set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"; cd "$ROOT"
@@ -16,7 +16,7 @@ echo "Target: $(printf '%s' "$DATABASE_URL" | sed -E 's#//([^:@/]+)(:[^@]*)?@#//
   revoke all on public.raheel_migrations from anon, authenticated;"
 
 mkdir -p build/backups; BACKUP="build/backups/before-$(date +%Y%m%d-%H%M%S).dump"
-echo "Backing up to $BACKUP ..."; pg_dump "$DATABASE_URL" -Fc --no-owner --no-privileges -f "$BACKUP"; echo "Backup ok ($(du -h "$BACKUP" | cut -f1))."
+echo "Backing up to $BACKUP ..."; pg_dump "$DATABASE_URL" --schema=public -Fc --no-owner --no-privileges -f "$BACKUP"; echo "Backup ok ($(du -h "$BACKUP" | cut -f1))."
 
 for id in "$@"; do
   f=$(ls backend/migrations/${id}_*.sql 2>/dev/null | head -1); [ -n "$f" ] || { echo "No migration $id"; exit 2; }

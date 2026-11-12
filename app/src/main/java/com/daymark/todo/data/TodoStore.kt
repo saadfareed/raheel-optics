@@ -381,8 +381,6 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
             filter += "(lower(json_extract(body,'$.title')) LIKE ? ESCAPE '\\' OR phone LIKE ? ESCAPE '\\')"
             args += "%$escaped%";args += "%${ListRules.phoneSearch(query.search) ?: escaped}%"
         }
-        if(query.outstandingOnly) filter += "balance>0"
-        query.returning?.let {filter+=if(it) "order_count>1" else "order_count<=1"}
         val sort=when(query.sort) {
             CustomerSort.RECENT -> "last_order DESC"
             CustomerSort.NEWEST -> "first_order DESC"

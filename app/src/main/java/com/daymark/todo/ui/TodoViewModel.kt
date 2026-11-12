@@ -8,7 +8,6 @@ import com.daymark.todo.core.*
 import com.daymark.todo.data.TodoStore
 import com.daymark.todo.data.OpticalStore
 import com.daymark.todo.identity.*
-import com.daymark.todo.history.HistoryRules
 import com.daymark.todo.sync.enqueueSync
 import com.daymark.todo.sync.scheduleSync
 import kotlinx.coroutines.*
@@ -35,21 +34,8 @@ data class UiState(
     val todos: List<Todo> = emptyList(),
     val todosMore: Boolean = false,
     val conflictPageNumber: Int = 1,
-    val savedHistoryPrevious: Boolean = false,
-    val cloudHistoryPrevious: Boolean = false,
     val todosLoading: Boolean = false,
-    val history: List<HistoryEntry> = emptyList(),
-    val historyMore: Boolean = true,
-    val historyLoading: Boolean = false,
-    val historyError: String? = null,
-    val olderHistory: List<HistoryEntry> = emptyList(),
-    val historyEnd: Boolean = false,
-    val historyPageNumber: Int = 1,
-    val historyCloudPage: Boolean = false,
-    val analyticsSummary: HistoryAnalytics? = null,
     val analyticsLoading: Boolean = false,
-    val localAnalytics: HistoryAnalytics? = null,
-    val pendingAnalytics: HistoryAnalytics? = null,
     val storageStats: com.daymark.todo.data.StorageStats? = null,
     val sessionIdleDays: Int = 30,
     val importActiveCount: Int? = null,
@@ -70,11 +56,9 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
     private val mutable=MutableStateFlow(UiState())
     val state=mutable.asStateFlow()
     private var observers: Job?=null
-    private var historyJob: Job?=null
     private var analyticsJob: Job?=null
     private var orderAnalyticsJob:Job?=null
     private var analyticsGeneration=0
-    private var analyticsDays:Int?=null
     private var conflictOffset=0
     private var store: TodoStore?=null
     private var pendingImport: Pair<TodoStore,TaskImportPreview>?=null
@@ -85,14 +69,8 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
     private var todoLimit=ListRules.PageSize
     /** The customer directory is the costliest query; it is only kept fresh while the Customers tab is open. */
     private var customersOpen=false
-    private var savedHistoryPages=CursorPages()
     private var todoCursor: ListCursor?=null
     private var todoJob: Job?=null
-    private var localHistoryMore=false
-    private var cloudCursor: ListCursor?=null
-    private var historyStarted=false
-    private var historyPages=CursorPages()
-    private var historyGeneration=0
     private var foreground=true
     fun foreground(active:Boolean) {
         foreground=active
@@ -122,14 +100,12 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
     fun clearHistoryCache()=action {
         val workspace=store ?: return@action
         workspace.clearConfirmedHistory()
-        mutable.update {it.copy(olderHistory=emptyList(),storageStats=null)}
-        cloudCursor=null;historyStarted=false
-        savedHistoryPages.reset()
+        mutable.update {it.copy(storageStats=null)}
         refresh();loadStorageStats()
     }
     fun clearLocalHistory()=action {
         store?.clearLocalHistory()
-        savedHistoryPages.reset();refresh();loadStorageStats()
+        refresh();loadStorageStats()
     }
     fun exportWorkspace(uri:android.net.Uri,selection:OpticalExportSelection=OpticalExportSelection.BACKUP)=action {
         val workspace=store ?: error("Sign in first.")
@@ -207,7 +183,7 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun clearDeviceData()=action {
         observers?.cancelAndJoin();observers=null
-        historyJob?.cancelAndJoin();analyticsJob?.cancelAndJoin();todoJob?.cancelAndJoin()
+        analyticsJob?.cancelAndJoin();todoJob?.cancelAndJoin()
         try {app.logout(clearDeviceData=true);store=null;mutable.update {UiState(config=app.sessions.config(),loading=false,message="Device data cleared.")}}
         catch(e:Exception) {attach();throw e}
     }
@@ -215,16 +191,14 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun attach() {
         pendingImport=null
-        observers?.cancelAndJoin(); historyJob?.cancelAndJoin(); analyticsJob?.cancelAndJoin(); todoJob?.cancelAndJoin()
-        todoCursor=null;conflictOffset=0;analyticsDays=null
-        historyPages.reset();savedHistoryPages.reset()
-        historyGeneration++
-        todoPages.reset(); cloudCursor=null; historyStarted=false
+        observers?.cancelAndJoin(); analyticsJob?.cancelAndJoin(); todoJob?.cancelAndJoin()
+        todoCursor=null;conflictOffset=0
+        todoPages.reset()
         val expired=app.sessions.hasExpiredSession()
         if(expired) app.logout()
         val session=app.sessions.session()
         app.sessions.markOpened()
-        mutable.update { UiState(session,app.sessions.config(),busy=it.busy,loading=session!=null,historyEnd=session?.localOnly==true,sessionIdleDays=app.sessions.idleDays(),message=if(expired) "Sign in again. Your local changes are safe." else null) }
+        mutable.update { UiState(session,app.sessions.config(),busy=it.busy,loading=session!=null,sessionIdleDays=app.sessions.idleDays(),message=if(expired) "Sign in again. Your local changes are safe." else null) }
         store=app.workspace()
         val workspace=store ?: run { mutable.update { it.copy(loading=false) }; return }
         workspace.reconcile()
@@ -269,41 +243,29 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         if(store===workspace) mutable.update {it.copy(snapshot=it.snapshot.copy(inbox=inbox))}
     }
 
-    private suspend fun refresh(analyticsChanged:Boolean=true) = refreshLock.withLock {
+    private suspend fun refresh() = refreshLock.withLock {
         val workspace=store ?: return@withLock
         val query=mutable.value.query
         val limit=todoLimit
-        val historyAnchor=savedHistoryPages.cursor
         val todos=workspace.todoPage(query,limit=limit)
-        val cached=workspace.historyPage(cursor=historyAnchor,limit=ListRules.PageSize)
         val customerQuery=mutable.value.customerQuery
         val customers=if(customersOpen) workspace.customerDirectory(customerQuery) else null
         val customerConflicts=workspace.db.getAll("SELECT DISTINCT json_extract(payload,'$.payload.customer.id') FROM optical_journal WHERE state='conflict' AND json_extract(payload,'$.payload.customer.id') IS NOT NULL") {it.getString(0)!!}.toSet()
-        var snapshot=workspace.uiSnapshot(todos.items,cached.items,mutable.value.olderHistory.map {it.todo.id},conflictOffset=conflictOffset)
+        var snapshot=workspace.uiSnapshot(todos.items,emptyList(),conflictOffset=conflictOffset)
         if(conflictOffset>0 && snapshot.pending.isEmpty()) {
             conflictOffset=0
-            snapshot=workspace.uiSnapshot(todos.items,cached.items,mutable.value.olderHistory.map {it.todo.id})
+            snapshot=workspace.uiSnapshot(todos.items,emptyList())
         }
-        if(store!==workspace || mutable.value.query!=query || todoLimit!=limit || savedHistoryPages.cursor!=historyAnchor) return@withLock
+        if(store!==workspace || mutable.value.query!=query || todoLimit!=limit) return@withLock
         todoCursor=todos.next
-        localHistoryMore=cached.next!=null
         mutable.update {
-            val history=if(it.historyCloudPage) HistoryRules.latest(HistoryRules.merge(
-                if(it.historyPageNumber==1) snapshot.history.filter {entry -> entry.pending} else emptyList(),it.olderHistory))
-                else HistoryRules.latest(cached.items)
             it.copy(snapshot=snapshot,loading=false,todos=todos.items,todosMore=todos.next!=null,
                 customers=if(customers!=null && it.customerQuery==customerQuery) customers.take(customerQuery.loaded*ListRules.PageSize) else it.customers,
                 customersLoaded=it.customersLoaded || (customers!=null && it.customerQuery==customerQuery),
                 customersMore=if(customers!=null && it.customerQuery==customerQuery) customers.size>customerQuery.loaded*ListRules.PageSize else it.customersMore,
                 customerConflicts=customerConflicts,
-                conflictPageNumber=conflictOffset/ListRules.PageSize+1,
-                savedHistoryPrevious=savedHistoryPages.canPrevious,
-                historyPageNumber=if(it.historyCloudPage) it.historyPageNumber else savedHistoryPages.number,
-                history=if(it.historyCloudPage) history else history.take(ListRules.PageSize),
-                historyMore=if(it.historyCloudPage) !it.historyEnd else localHistoryMore)
+                conflictPageNumber=conflictOffset/ListRules.PageSize+1)
         }
-        try {if(analyticsChanged) refreshLocalAnalytics(workspace)} catch(e:CancellationException) {throw e}
-        catch(_:Exception) { /* Preserve the successfully published page and previous analytics. */ }
     }
 
     private fun action(block: suspend ()->Unit) {
@@ -347,7 +309,7 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun deleteAccount(password:String)=action {
         observers?.cancelAndJoin(); observers=null
-        historyJob?.cancelAndJoin(); analyticsJob?.cancelAndJoin(); todoJob?.cancelAndJoin()
+        analyticsJob?.cancelAndJoin(); todoJob?.cancelAndJoin()
         try {
             app.deleteAccount(password); store=null
             mutable.update { UiState(config=app.sessions.config(),loading=false,message="Account deleted.") }
@@ -357,7 +319,7 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun logout()=action {
-        observers?.cancelAndJoin(); observers=null; historyJob?.cancelAndJoin(); analyticsJob?.cancelAndJoin(); todoJob?.cancelAndJoin()
+        observers?.cancelAndJoin(); observers=null; analyticsJob?.cancelAndJoin(); todoJob?.cancelAndJoin()
         try { app.logout() }
         finally {
             // Cleanup may report a database failure after successfully clearing credentials.
@@ -421,10 +383,10 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
                         .jsonArray.map {json.decodeFromJsonElement<Customer>(it)}
                     if(store!==workspace) return@launch
                     OpticalStore(workspace.db,workspace.accountId).cacheCustomers(rows)
-                    if(rows.size<100) {refresh(false);return@launch}
+                    if(rows.size<100) {refresh();return@launch}
                     after=rows.last().id
                 }
-                refresh(false)
+                refresh()
             } catch(e:CancellationException) {throw e}
             catch(_:Exception) {mutable.update {it.copy(message="Showing customers on this device. Cloud customer refresh is unavailable.")}}
         }
@@ -471,7 +433,7 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         customersOpen=true
         mutable.update {it.copy(customerQuery=query)}
         viewModelScope.launch {
-            try {refresh(analyticsChanged=false)}
+            try {refresh()}
             catch(e:CancellationException) {throw e}
             catch(_:Exception) {mutable.update {it.copy(message="Couldn't load customers. Try again.")}}
         }
@@ -485,7 +447,7 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         todoPages.reset()
         mutable.update { it.copy(query=query,todos=emptyList(),todosMore=false,todosLoading=true) }
         todoJob=viewModelScope.launch {
-            try {refresh(analyticsChanged=false)} catch(e:CancellationException) {throw e}
+            try {refresh()} catch(e:CancellationException) {throw e}
             catch(_:Exception) {mutable.update {it.copy(message="Couldn't load tasks.")}}
             finally {if(todoJob===currentCoroutineContext()[Job]) mutable.update {it.copy(todosLoading=false)}}
         }
@@ -495,7 +457,7 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         mutable.update {it.copy(todosLoading=true)}
         todoLimit+=ListRules.PageSize
         todoJob=viewModelScope.launch {
-            try {refresh(analyticsChanged=false)}
+            try {refresh()}
             catch(e:CancellationException) {throw e}
             catch(_:Exception) {todoLimit=(todoLimit-ListRules.PageSize).coerceAtLeast(ListRules.PageSize);mutable.update {it.copy(message="Couldn't load more orders.")}}
             finally {mutable.update {it.copy(todosLoading=false)}}
@@ -504,28 +466,18 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
     suspend fun ordersForCustomer(row:CustomerDirectoryRow):List<Todo> =
         (store ?: return emptyList()).customerOrders(row.customer?.id ?: row.latestOrder.customerId,row.latestOrder.normalizedMobile)
     fun closeCustomers() {customersOpen=false}
-    private suspend fun refreshLocalAnalytics(workspace:TodoStore) {
-        val days=analyticsDays ?: return
-        val generation=analyticsGeneration
-        val summary=mutable.value.analyticsSummary
-        val zone=java.time.ZoneId.systemDefault().id
-        val local=if(summary==null || summary.priorityTrends.isEmpty()) workspace.localAnalytics(days,zone) else null
-        val overlay=if(summary!=null) workspace.localAnalytics(days,zone,summary.revision) else null
-        if(generation==analyticsGeneration && store===workspace && mutable.value.analyticsSummary==summary)
-            mutable.update {it.copy(localAnalytics=local,pendingAnalytics=overlay)}
-    }
     fun closeAnalytics() {
-        analyticsDays=null;analyticsGeneration++;analyticsJob?.cancel()
-        mutable.update {it.copy(analyticsLoading=false,localAnalytics=null,pendingAnalytics=null)}
+        analyticsGeneration++;analyticsJob?.cancel()
+        mutable.update {it.copy(analyticsLoading=false)}
     }
     fun loadMoreConflicts() {
         if(conflictOffset+ListRules.PageSize>=mutable.value.snapshot.conflictCount) return
         conflictOffset+=ListRules.PageSize
-        viewModelScope.launch {runCatching {refresh(analyticsChanged=false)}}
+        viewModelScope.launch {runCatching {refresh()}}
     }
     fun previousConflicts() {
         conflictOffset=(conflictOffset-ListRules.PageSize).coerceAtLeast(0)
-        viewModelScope.launch {runCatching {refresh(analyticsChanged=false)}}
+        viewModelScope.launch {runCatching {refresh()}}
     }
     fun readAlert(id:String)=action { store!!.markRead(id); refreshInbox() }
     fun resolveConflict(p:PendingOperation,saveAsNew:Boolean)=action {

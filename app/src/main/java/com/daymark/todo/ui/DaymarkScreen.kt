@@ -489,7 +489,7 @@ private fun CustomersScreen(state:UiState,model:TodoViewModel,newOrder:(Todo)->U
     var editing by remember {mutableStateOf<Customer?>(null)}
     var viewing by remember {mutableStateOf<CustomerDirectoryRow?>(null)}
     val list=rememberLazyListState()
-    LaunchedEffect(query.search,query.sort,query.outstandingOnly,query.returning) {list.scrollToItem(0)}
+    LaunchedEffect(query.search,query.sort) {list.scrollToItem(0)}
     fun whatsApp(row:CustomerDirectoryRow) {scope.launch {
         val customer=row.latestOrder
         try {
