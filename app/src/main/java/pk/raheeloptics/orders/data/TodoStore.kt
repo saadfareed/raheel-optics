@@ -117,17 +117,7 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
             it.getString(0)!! to (it.getString(1)!! to it.getLong(2)!!)
         }.toMap()
         val currentStates=serverStates + remote.associate {it.id to (it.status to it.revision)} + localStates + drafts.associate {it.id to (it.status to it.revision)}
-        val draftById = drafts.associateBy { it.id }
-        val remoteIds = remote.map { it.id }.toSet()
-        val candidates = history.groupBy { it.todo.id }.mapValues { (_, entries) -> entries.maxBy { it.todo.revision } }
-        val completed = candidates.values.filter { it.todo.status == "completed" && it.action in listOf("complete","edit") }.map { it.todo }.filter { todo ->
-            if(localOnly) localStates[todo.id] == ("completed" to todo.revision)
-            else {
-                val draft = draftById[todo.id]
-                if(draft!=null) draft==todo else todo.id !in remoteIds && (serverStates[todo.id]==null || serverStates[todo.id]==("completed" to todo.revision))
-            }
-        }.associateBy { it.id }
-        Snapshot(overlaid, history, pending, Rules.overlayTotals(totals, pending), inbox, completed, currentStates)
+        Snapshot(todos=overlaid,history=history,pending=pending,totals=Rules.overlayTotals(totals,pending),inbox=inbox,currentStates=currentStates)
     } }
 
     /** Page payloads plus scalar aggregates; never decodes the whole account or queue. */
@@ -154,23 +144,9 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
                     FROM journal WHERE state='conflict')
                 SELECT payload,state,ack_revision,message FROM ranked WHERE rank=1 ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?
             """.trimIndent(),listOf(conflictLimit,conflictOffset)) { PendingOperation(json.decodeFromString<Operation>(it.getString(0)!!),it.getString(1)!!,it.getLong(2)!!,it.getString(3).orEmpty()) }
-            val distribution=tx.getAll("WITH effective AS ($effectiveTodos) SELECT coalesce(json_extract(body,'$.priority'),'Medium'),count(*),count(CASE WHEN json_extract(body,'$.dueAt')<? THEN 1 END) FROM effective WHERE coalesce(json_extract(body,'$.status'),'active')='active' GROUP BY coalesce(json_extract(body,'$.priority'),'Medium')",listOf(now)) {
-                Triple(it.getString(0)!!,it.getLong(1)!!.toInt(),it.getLong(2)!!.toInt())
-            }
-            val (todayStart,todayEnd)=ListRules.timeBounds(now,java.time.ZoneId.systemDefault())
-            val dueToday=tx.get("WITH effective AS ($effectiveTodos) SELECT count(*) FROM effective WHERE coalesce(json_extract(body,'$.status'),'active')='active' AND json_extract(body,'$.dueAt')>=? AND json_extract(body,'$.dueAt')<?",listOf(todayStart,todayEnd)) {it.getLong(0)!!.toInt()}
-            val completedToday=if(localOnly) tx.get("""
-                SELECT count(*) FROM local_state s WHERE s.status='completed' AND EXISTS(
-                    SELECT 1 FROM history_cache h WHERE json_extract(h.body,'$.todo.id')=s.id
-                    AND json_extract(h.body,'$.todo.revision')=s.revision AND json_extract(h.body,'$.action')='complete'
-                    AND h.occurred_at>=? AND h.occurred_at<?)
-            """.trimIndent(),listOf(todayStart,todayEnd)) {it.getLong(0)!!.toInt()}
-            else tx.get("WITH effective AS ($effectiveTodos) SELECT count(*) FROM effective WHERE json_extract(body,'$.status')='completed' AND json_extract(body,'$.completedAt')>=? AND json_extract(body,'$.completedAt')<?",listOf(todayStart,todayEnd)) {it.getLong(0)!!.toInt()}
-            val focus=tx.getOptional("WITH effective AS ($effectiveTodos) SELECT body FROM effective WHERE coalesce(json_extract(body,'$.status'),'active')='active' ORDER BY coalesce(json_extract(body,'$.dueAt'),9223372036854775807),CASE json_extract(body,'$.priority') WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 ELSE 2 END,id LIMIT 1") {json.decodeFromString<Order>(it.getString(0)!!)}
             val inbox=tx.getAll("SELECT id,todo_id,title,time,read FROM inbox ORDER BY time DESC LIMIT 100") { InboxItem(it.getString(0)!!,it.getString(1)!!,it.getString(2)!!,it.getLong(3)!!,it.getLong(4)==1L) }
             val ids=(todos.map {it.id}+history.map {it.todo.id}+inbox.map {it.todoId}+additionalIds).distinct()
             val states=mutableMapOf<String,Pair<String,Long>>()
-            val conflictedIds=mutableSetOf<String>()
             for(chunk in ids.chunked(400)) {
                 val placeholders=chunk.joinToString(",") {"?"}
                 val remote=tx.getAll("SELECT id,json_extract(body,'$.status'),coalesce(json_extract(body,'$.revision'),0) FROM server_todos WHERE id IN ($placeholders)",chunk) { it.getString(0)!! to (it.getString(1).orEmpty() to it.getLong(2)!!) }
@@ -178,26 +154,15 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
                 states.putAll(legacy);states.putAll(remote)
                 if(localOnly) states.putAll(tx.getAll("SELECT id,status,revision FROM local_state WHERE id IN ($placeholders)",chunk) {it.getString(0)!! to (it.getString(1)!! to it.getLong(2)!!)})
                 states.putAll(tx.getAll("SELECT id,json_extract(body,'$.status'),json_extract(body,'$.revision') FROM drafts WHERE id IN ($placeholders)",chunk) {it.getString(0)!! to (it.getString(1)!! to it.getLong(2)!!)})
-                conflictedIds.addAll(tx.getAll("SELECT DISTINCT json_extract(payload,'$.todo.id') FROM journal WHERE state='conflict' AND json_extract(payload,'$.todo.id') IN ($placeholders)",chunk) {it.getString(0)!!})
             }
-            val completed=history.filter {it.todo.status=="completed" && it.action in listOf("complete","edit") && (states[it.todo.id]==null || states[it.todo.id]==("completed" to it.todo.revision))}.associate {it.todo.id to it.todo}
             val statusCounts=tx.getAll("WITH effective AS ($allOrders) SELECT $opticalStatus,count(*) FROM effective GROUP BY $opticalStatus") {
                 OrderStatus.valueOf(it.getString(0)!!) to it.getLong(1)!!.toInt()
             }.toMap()
-            Snapshot(todos,history,conflicts,totals,inbox,completed,states,counts.first,counts.second,
-                distribution.sumOf {it.third},distribution.associate {it.first to it.second},states.filterValues {it.first=="active"}.keys,conflictedIds,recoveryCount,dueToday,completedToday,focus,statusCounts)
+            Snapshot(todos=todos,history=history,pending=conflicts,totals=totals,inbox=inbox,currentStates=states,queuedCount=counts.first,
+                conflictCount=counts.second,activeTaskIds=states.filterValues {it.first=="active"}.keys,recoveryCount=recoveryCount,orderStatusCounts=statusCounts)
         }
     }
 
-    suspend fun completedTodo(id: String): Order? = db.readTransaction { tx ->
-        val draft=tx.getOptional("SELECT body FROM drafts WHERE id=?",listOf(id)) {json.decodeFromString<Order>(it.getString(0)!!)}
-        if(draft!=null) return@readTransaction draft.takeIf {it.status=="completed"}
-        val state=if(localOnly) tx.getOptional("SELECT status,revision FROM local_state WHERE id=?",listOf(id)) {it.getString(0)!! to it.getLong(1)!!}
-            else tx.getOptional("SELECT json_extract(body,'$.status'),json_extract(body,'$.revision') FROM server_todos WHERE id=?",listOf(id)) {it.getString(0)!! to it.getLong(1)!!}
-        if(state!=null && state.first!="completed") return@readTransaction null
-        val entry=tx.getOptional("SELECT body FROM history_cache WHERE state<>'conflict' AND json_extract(body,'$.todo.id')=? ORDER BY CAST(json_extract(body,'$.todo.revision') AS INTEGER) DESC,occurred_at DESC,id DESC LIMIT 1",listOf(id)) {json.decodeFromString<HistoryEntry>(it.getString(0)!!)}
-        entry?.takeIf {it.todo.status=="completed" && it.action in listOf("complete","edit") && (state==null || state==("completed" to it.todo.revision))}?.todo
-    }
 
     private val alertEvents="""
         WITH effective AS ($effectiveTodos), events AS (
@@ -234,27 +199,6 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         return dueTaskAlerts(limit=1).isNotEmpty()
     }
 
-    /** SQL buckets preserve timezone/DST boundaries without deserializing event payloads. */
-    suspend fun localAnalytics(days:Int,zone:String,afterRevision:Long?=null):HistoryAnalytics {
-        require(days in 1..30)
-        val timezone=java.time.ZoneId.of(zone)
-        val today=java.time.LocalDate.now(timezone)
-        val boundaries=(days-1 downTo -1).map {today.minusDays(it.toLong()).atStartOfDay(timezone).toInstant().toEpochMilli()}
-        val eligible="state<>'conflict' AND (state<>'acked' OR ack_revision>?)"
-        val events=if(afterRevision!=null) "SELECT id,payload AS body FROM journal WHERE $eligible" else
-            "SELECT id,body FROM history_cache WHERE state<>'conflict' AND id NOT IN(SELECT id FROM journal WHERE $eligible) UNION ALL SELECT id,payload AS body FROM journal WHERE $eligible"
-        val eventArgs=if(afterRevision!=null) listOf(afterRevision) else listOf(0L,0L)
-        val eventTime="CAST(json_extract(body,'$.occurredAt') AS INTEGER)"
-        val bucket=(0 until days).joinToString(" ") {"WHEN $eventTime>=? AND $eventTime<? THEN $it"}
-        val bounds=(0 until days).flatMap {listOf(boundaries[it],boundaries[it+1])}
-        return db.readTransaction {tx ->
-            val rows=tx.getAll("WITH events AS ($events) SELECT CASE $bucket END AS day,coalesce(json_extract(body,'$.todo.priority'),'Medium') AS priority,count(*) FROM events WHERE json_extract(body,'$.action')='complete' AND $eventTime>=? AND $eventTime<? GROUP BY day,priority",
-                eventArgs+bounds+listOf(boundaries.first(),boundaries.last())) {Triple(it.getLong(0)!!.toInt(),it.getString(1)!!,it.getLong(2)!!.toInt())}
-            val deadlines=tx.get("WITH events AS ($events) SELECT count(CASE WHEN json_extract(body,'$.todo.dueAt') IS NOT NULL THEN 1 END),count(CASE WHEN json_extract(body,'$.todo.dueAt') IS NOT NULL AND $eventTime<=CAST(json_extract(body,'$.todo.dueAt') AS INTEGER) THEN 1 END) FROM events WHERE json_extract(body,'$.action')='complete'",eventArgs) {it.getLong(0)!!.toInt() to it.getLong(1)!!.toInt()}
-            val priority=listOf("High","Medium","Low").associateWith {priority -> (0 until days).map {day -> rows.filter {it.first==day && it.second==priority}.sumOf {it.third}}}
-            HistoryAnalytics((0 until days).map {day -> rows.filter {it.first==day}.sumOf {it.third}},deadlines.first,deadlines.second,afterRevision ?: 0,priority)
-        }
-    }
 
     suspend fun hasQueuedOperations(): Boolean = db.get("SELECT EXISTS(SELECT 1 FROM journal WHERE state='queued')") { it.getLong(0)==1L }
     suspend fun needsSync():Boolean = hasQueuedOperations() || db.get("SELECT EXISTS(SELECT 1 FROM ps_crud)") {it.getLong(0)==1L} || db.get("SELECT EXISTS(SELECT 1 FROM sync_checkpoint WHERE id='checkpoint' AND todo_id<>'ffffffff-ffff-ffff-ffff-ffffffffffff')") {it.getLong(0)==1L}
@@ -492,23 +436,6 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         return TodoPage(page.map {it.first}, if(rows.size > limit) page.last().let {(order,textKey) -> ListCursor(ListRules.sortKey(order,query.sort),order.id,textKey) } else null)
     }
 
-    suspend fun historyPage(cursor: ListCursor? = null, limit: Int = ListRules.PageSize): HistoryPage {
-        require(limit > 0 && limit < Int.MAX_VALUE)
-        val args = mutableListOf<Any?>()
-        val condition = if(cursor == null) "" else "AND (occurred_at,todo_id)<(?,?)".also { args += cursor.value; args += cursor.id }
-        args += limit + 1
-        val rows = db.getAll("""
-            WITH ranked AS (
-                SELECT body,state,occurred_at,json_extract(body,'$.todo.id') AS todo_id,
-                    row_number() OVER (PARTITION BY json_extract(body,'$.todo.id') ORDER BY
-                        CASE WHEN state='queued' THEN 1 ELSE 0 END DESC,
-                        CAST(json_extract(body,'$.todo.revision') AS INTEGER) DESC,occurred_at DESC,id DESC) AS rank
-                FROM history_cache WHERE state<>'conflict'
-            ) SELECT body,state FROM ranked WHERE rank=1 $condition ORDER BY occurred_at DESC,todo_id DESC LIMIT ?
-        """.trimIndent(),args) { json.decodeFromString<HistoryEntry>(it.getString(0)!!).copy(pending=it.getString(1)=="queued") }
-        val page=rows.take(limit)
-        return HistoryPage(page,if(rows.size>limit) page.last().let { ListCursor(it.occurredAt,it.todo.id) } else null)
-    }
 
     private fun admit(tx:com.powersync.db.internal.PowerSyncTransaction, action:String, replacingConflictTodoId:String?=null) {
         check(availableBytes()>=admission.minFreeBytes) {"Device storage is low. Free device space before saving more changes. Your existing work is retained; cleanup and export are available in Settings."}
@@ -710,13 +637,6 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         tx.execute("INSERT OR REPLACE INTO history_cache(id,body,occurred_at,state) SELECT ?,?,?,'confirmed' WHERE NOT EXISTS (SELECT 1 FROM history_cache WHERE id=? AND state IN ('queued','conflict','local'))",
             listOf(entry.id,json.encodeToString(entry.copy(pending=false)),entry.occurredAt,entry.id))
     }
-    suspend fun rememberHistoryForAction(entry: HistoryEntry) {
-        db.writeTransaction {tx -> cacheConfirmedHistory(tx,entry)}
-    }
-    suspend fun cacheHistory(entries: List<HistoryEntry>) {
-        db.writeTransaction {tx -> entries.forEach {cacheConfirmedHistory(tx,it)}}
-        reconcile()
-    }
 
     /** Inbox-only refresh avoids task, history, journal and analytics queries. */
     suspend fun inboxItems():List<InboxItem> = db.getAll("SELECT id,todo_id,title,time,read FROM inbox ORDER BY time DESC,id DESC LIMIT 100") {
@@ -739,11 +659,4 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         return delivered
     }
 
-    /** One bounded batch; receipts checkpoint progress before any continuation. */
-    suspend fun deliverMissedReminderBatch(notifyBatch:(List<Order>)->Unit,limit:Int=100):Boolean {
-        require(limit in 1..100)
-        val batch=missedReminders(limit)
-        if(batch.isNotEmpty()) notifyBatch(batch)
-        return reminderTodos(dueBefore=System.currentTimeMillis(),undelivered=true,limit=1).isNotEmpty()
-    }
 }

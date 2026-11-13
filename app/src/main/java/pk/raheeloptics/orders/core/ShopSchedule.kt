@@ -83,11 +83,3 @@ object Money {
         return if(paid==old) previous else previous+Payment(java.util.UUID.randomUUID().toString(),paid-old,receivedAt=now)
     }
 }
-
-object WhatsAppLink {
-    /** wa.me link for a Pakistani mobile (digits only, with country code); null if the number is invalid. */
-    fun url(mobile:String,message:String):String? {
-        val digits=(PakistanPhone.normalize(mobile) ?: return null).filter(Char::isDigit)
-        return "https://wa.me/$digits?text=${java.net.URLEncoder.encode(message,"UTF-8").replace("+","%20")}"
-    }
-}

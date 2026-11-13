@@ -29,7 +29,6 @@ data class UiState(
     val codeIsReset: Boolean = false,
     val online: Boolean = false,
     val syncProblem: String? = null,
-    val lastSync: String? = null,
     val query: TodoQuery = TodoQuery(view=OrderView.ACTIVE),
     val todos: List<Order> = emptyList(),
     val todosMore: Boolean = false,

@@ -12,12 +12,6 @@ class FirstRunAndCadenceTest {
         assertFalse(OnboardingPolicy.shouldShow(false,true))
         assertFalse(OnboardingPolicy.shouldShow(true,true))
     }
-    @Test fun startupJitterIsBounded() {
-        assertEquals(0L,SyncCadence.startupDelayMillis(0.0))
-        assertEquals(1500L,SyncCadence.startupDelayMillis(0.5))
-        assertEquals(3000L,SyncCadence.startupDelayMillis(1.0))
-        assertThrows(IllegalArgumentException::class.java) {SyncCadence.startupDelayMillis(Double.NaN)}
-    }
     @Test fun pollingIsSpreadAndRetryDelayIsBounded() {
         assertEquals(120000L,SyncCadence.delayMillis(120,sample=0.0))
         assertEquals(144000L,SyncCadence.delayMillis(120,sample=1.0))

@@ -60,7 +60,6 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
     // optical_drafts holds both customer and order overlays in one table (mirrors TodoStore's single drafts
     // table). Customer drafts key on the customer id, order drafts on the order id; a "kind" discriminator in
     // the serialized body separates them for the snapshot read.
-    private val customerBody = """SELECT body FROM optical_drafts WHERE id=? AND json_extract(body,'$.kind')='customer'"""
     private val orderBody = """SELECT body FROM optical_drafts WHERE id=? AND json_extract(body,'$.kind')='order'"""
 
     private fun customerDraft(json: String): Customer = this.json.decodeFromString<Customer>(json)
@@ -210,8 +209,6 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
             // Drafts win over synced rows on id collision; synced rows reconstruct from their own columns (not a body
             // blob — the synced tables are decomposed). Optical synced tables start empty, so a queued order_create is
             // visible purely from the drafts overlay.
-            val syncedCustomerIds = tx.getAll("SELECT id FROM optical_customers WHERE id NOT IN (SELECT id FROM optical_drafts WHERE json_extract(body,'$.kind')='customer')") { it.getString(0)!! }
-            val draftCustomers = tx.getAll("SELECT body FROM optical_drafts WHERE json_extract(body,'$.kind')='customer'") { customerDraft(it.getString(0)!!) }
             val syncedOrderIds = tx.getAll("SELECT id FROM optical_orders WHERE id NOT IN (SELECT id FROM optical_drafts WHERE json_extract(body,'$.kind')='order')") { it.getString(0)!! }
             val draftOrders = tx.getAll("SELECT body FROM optical_drafts WHERE json_extract(body,'$.kind')='order'") { orderDraft(it.getString(0)!!) }
             val customers = tx.getAll("SELECT body FROM ($customerProfilesSql)") {customerDraft(it.getString(0)!!)}.sortedBy {it.name.lowercase()}

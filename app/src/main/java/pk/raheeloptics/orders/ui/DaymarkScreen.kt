@@ -71,7 +71,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import pk.raheeloptics.orders.DaymarkApp
 import pk.raheeloptics.orders.R
 import pk.raheeloptics.orders.core.*
-import pk.raheeloptics.orders.analytics.Analytics
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.serialization.json.Json

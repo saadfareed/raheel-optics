@@ -15,6 +15,6 @@ Application ID: `pk.raheeloptics.orders`.
 
 ## Backend
 
-Apply the SQL files in `backend/migrations` to a separate Supabase project. Do not
+Apply the SQL files in `supabase/migrations` to a separate Supabase project. Do not
 point this clone at Daymark's production project. Configure public client values in
 `.env` using `.env.example` as the template.

@@ -35,13 +35,6 @@ class CustomerMessagesTest {
     @Test fun missingShopNumberFallsBackToGenericContact() {
         assertTrue(ShopSchedule(phone="").duesMessage("A",listOf(order("RO-1",1000,0)),monday).contains("contact the shop"))
     }
-    @Test fun whatsAppLinkUsesCountryCodeDigitsAndEncodesTheText() {
-        val url=WhatsAppLink.url("0300 1234567","Due PKR 1,200 & more\nline")!!
-        assertTrue(url,url.startsWith("https://wa.me/923001234567?text="))
-        assertTrue(url.contains("Due%20PKR%201%2C200%20%26%20more%0Aline"))
-        assertEquals(WhatsAppLink.url("+92 300 1234567","x"),WhatsAppLink.url("03001234567","x"))
-        assertNull(WhatsAppLink.url("12345","x"))
-    }
     @Test fun orderViewsPartitionTheStatuses() {
         assertEquals(setOf(OrderStatus.ACTIVE),OrderView.ACTIVE.statuses);assertEquals(setOf(OrderStatus.READY_FOR_PICKUP),OrderView.READY.statuses)
         val covered=listOf(OrderView.ACTIVE,OrderView.READY,OrderView.COMPLETE,OrderView.CANCEL).flatMap {it.statuses!!}

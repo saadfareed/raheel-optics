@@ -19,7 +19,7 @@ mkdir -p build/backups; BACKUP="build/backups/before-$(date +%Y%m%d-%H%M%S).dump
 echo "Backing up to $BACKUP ..."; pg_dump "$DATABASE_URL" --schema=public -Fc --no-owner --no-privileges -f "$BACKUP"; echo "Backup ok ($(du -h "$BACKUP" | cut -f1))."
 
 for id in "$@"; do
-  f=$(ls backend/migrations/${id}_*.sql 2>/dev/null | head -1); [ -n "$f" ] || { echo "No migration $id"; exit 2; }
+  f=$(ls supabase/migrations/${id}_*.sql 2>/dev/null | head -1); [ -n "$f" ] || { echo "No migration $id"; exit 2; }
   name=$(basename "$f")
   if [ "$("${P[@]}" -Atc "select count(*) from public.raheel_migrations where name='$name'")" = 1 ]; then echo "skip $name (already applied)"; continue; fi
   case "$id" in

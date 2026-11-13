@@ -67,18 +67,11 @@ data class Snapshot(
     val pending: List<PendingOperation> = emptyList(),
     val totals: Totals = Totals(),
     val inbox: List<InboxItem> = emptyList(),
-    val completedTodos: Map<String, Order> = emptyMap(),
     val currentStates: Map<String, Pair<String, Long>> = emptyMap(),
     val queuedCount: Int = 0,
     val conflictCount: Int = 0,
-    val overdueCount: Int = 0,
-    val priorityCounts: Map<String, Int> = emptyMap(),
     val activeTaskIds: Set<String> = emptySet(),
-    val conflictedTaskIds: Set<String> = emptySet(),
     val recoveryCount: Int = 0,
-    val dueTodayCount:Int = 0,
-    val completedTodayCount:Int = 0,
-    val focusTask:Order? = null,
     val orderStatusCounts: Map<OrderStatus, Int> = emptyMap(),
 )
 

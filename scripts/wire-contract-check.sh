@@ -11,7 +11,7 @@ W=$(mktemp -d /tmp/wirecheck.XXXX); trap 'pg_ctl -D "$W/data" stop -m fast >/dev
 initdb -D "$W/data" -A trust -U wire >/dev/null; pg_ctl -D "$W/data" -o "-k $W -p 5588 -c listen_addresses=''" -l "$W/log" -w start >/dev/null
 export PGHOST="$W" PGPORT=5588 PGUSER=wire; createdb wire; export PGDATABASE=wire
 P=(psql -v ON_ERROR_STOP=1 -q)
-"${P[@]}" -f backend/tests/bootstrap.sql; for f in $(ls backend/migrations/*.sql | sort); do "${P[@]}" -f "$f"; done
+"${P[@]}" -f supabase/tests/bootstrap.sql; for f in $(ls supabase/migrations/*.sql | sort); do "${P[@]}" -f "$f"; done
 USER_ID=11111111-1111-1111-1111-111111111111; n=0
 while IFS=$'\t' read -r rpc body; do
   n=$((n+1))

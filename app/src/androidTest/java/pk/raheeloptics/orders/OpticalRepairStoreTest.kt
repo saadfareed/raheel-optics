@@ -55,7 +55,7 @@ class OpticalRepairStoreTest {
             store.transition(original,"complete")
             val completed=store.orderById(original.id)!!
             store.save(completed.copy(payments=listOf(Payment("payment",500,receivedAt=150))),"edit",completed)
-            val paid=store.completedTodo(original.id)!!
+            val paid=store.orderById(original.id)!!
             assertEquals(500L,paid.payments.sumOf {it.amountPaisa})
             assertEquals(OrderStatus.COMPLETE,paid.orderStatus)
             assertEquals(1,store.todoPage(TodoQuery(payment=PaymentFilter.PARTIAL)).items.size)
