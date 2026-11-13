@@ -96,8 +96,7 @@ fun SplashScreen() {
         BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding()) {
         val compact=maxHeight<400.dp
         Column(Modifier.fillMaxWidth().heightIn(min=maxHeight).verticalScroll(rememberScrollState()).padding(horizontal=24.dp,vertical=16.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally) {
-            val splashLogo=R.drawable.raheel_optics_logo
-            Image(painterResource(splashLogo),LocalBrand.current.config.name+" logo",Modifier.size(if(compact) 48.dp else 112.dp))
+            BrandLogo(Modifier.size(if(compact) 48.dp else 112.dp))
             Spacer(Modifier.height(if(compact) 8.dp else 24.dp))
             Text(LocalBrand.current.config.name,color=MaterialTheme.colorScheme.onBackground,fontWeight=FontWeight.Bold,style=if(compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,textAlign=androidx.compose.ui.text.style.TextAlign.Center,modifier=Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
