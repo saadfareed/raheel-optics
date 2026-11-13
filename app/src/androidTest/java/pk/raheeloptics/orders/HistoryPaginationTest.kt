@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.platform.app.InstrumentationRegistry
 import pk.raheeloptics.orders.core.*
 import pk.raheeloptics.orders.identity.Session
-import pk.raheeloptics.orders.ui.TodoViewModel
+import pk.raheeloptics.orders.ui.OrdersViewModel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.Assert.*
@@ -18,7 +18,7 @@ import java.util.UUID
 
 class HistoryPaginationTest {
     private val compose=createAndroidComposeRule<MainActivity>()
-    private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as DaymarkApp
+    private val app get()=InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as RaheelApp
     private val account="history-test-${UUID.randomUUID()}"
     private var previousTotals:Totals?=null
     private val fixture=object : ExternalResource() {
@@ -54,8 +54,8 @@ class HistoryPaginationTest {
     @get:Rule val rules:RuleChain=RuleChain.outerRule(fixture).around(compose)
 
     @Test fun loadMoreAppendsOrdersAndKeepsEarlierRowsInPlace() {
-        lateinit var model:TodoViewModel
-        compose.runOnUiThread {model=ViewModelProvider(compose.activity)[TodoViewModel::class.java]}
+        lateinit var model:OrdersViewModel
+        compose.runOnUiThread {model=ViewModelProvider(compose.activity)[OrdersViewModel::class.java]}
         compose.waitUntil(10000) {!model.state.value.loading && !model.state.value.busy}
         // Only this test's own orders count, whatever else the shared test data holds (for example demo orders).
         compose.runOnUiThread {model.updateQuery(model.state.value.query.copy(search="Task "))}

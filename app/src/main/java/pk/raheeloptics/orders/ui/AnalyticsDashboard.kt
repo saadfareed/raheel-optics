@@ -21,7 +21,7 @@ import pk.raheeloptics.orders.core.*
 import java.time.LocalDate
 
 @OptIn(ExperimentalLayoutApi::class)
-@Composable internal fun OpticalAnalyticsScreen(state:UiState,model:TodoViewModel) {
+@Composable internal fun OpticalAnalyticsScreen(state:UiState,model:OrdersViewModel) {
     val context=LocalContext.current
     var query by remember {mutableStateOf(OrderAnalyticsQuery())}
     LaunchedEffect(query,state.snapshot.totals.revision,state.session?.userId) {model.loadOrderAnalytics(query)}

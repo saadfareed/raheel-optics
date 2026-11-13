@@ -3,7 +3,7 @@ package pk.raheeloptics.orders
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import pk.raheeloptics.orders.core.Order
-import pk.raheeloptics.orders.data.TodoStore
+import pk.raheeloptics.orders.data.OrderStore
 import pk.raheeloptics.orders.data.appSchema
 import com.powersync.PowerSyncDatabase
 import com.powersync.DatabaseDriverFactory
@@ -18,12 +18,12 @@ import java.util.UUID
 class OfflineStoreTest {
     private val openedDatabases=mutableListOf<PowerSyncDatabase>()
     private val testFiles=mutableSetOf<String>()
-    private fun store(context:android.content.Context,account:String,localOnly:Boolean):TodoStore {
+    private fun store(context:android.content.Context,account:String,localOnly:Boolean):OrderStore {
         val filename="test-$account.db"
         testFiles+=filename
         val database=PowerSyncDatabase(DatabaseDriverFactory(context),appSchema,dbFilename=filename)
         openedDatabases+=database
-        return TodoStore(database,account,localOnly)
+        return OrderStore(database,account,localOnly)
     }
 
     @After fun removeTestDatabases()=runBlocking {

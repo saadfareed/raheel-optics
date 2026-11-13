@@ -1,7 +1,7 @@
 package pk.raheeloptics.orders.sync
 
 import pk.raheeloptics.orders.core.*
-import pk.raheeloptics.orders.data.TodoStore
+import pk.raheeloptics.orders.data.OrderStore
 import pk.raheeloptics.orders.data.OpticalStore
 import pk.raheeloptics.orders.identity.BackendTransport
 import pk.raheeloptics.orders.identity.ApiException
@@ -14,7 +14,7 @@ import kotlinx.serialization.json.*
  * queued change at a time (customers through upsert_optical_customer, orders through apply_optical_order), then
  * orders are downloaded from optical_order_feed. Nothing here reads or writes the legacy todos tables.
  */
-class SupabaseSynchronizer(private val store: TodoStore, private val backend: BackendTransport) {
+class SupabaseSynchronizer(private val store: OrderStore, private val backend: BackendTransport) {
     private val json=Json {ignoreUnknownKeys=true;encodeDefaults=true}
     private var apiChecked=false
     private val rejectedCodes=setOf(400,404,409,413,422)

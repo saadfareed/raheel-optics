@@ -97,7 +97,7 @@ import kotlinx.coroutines.withContext
             item {FlowRow(horizontalArrangement=Arrangement.spacedBy(Ui.Tight),verticalArrangement=Arrangement.spacedBy(Ui.Tight)) {
                 if(!order.orderStatus.isTerminal) OutlinedButton(onClick=edit,enabled=!busy,shape=Ui.Field) {Text("Edit order")}
                 if(order.orderStatus==OrderStatus.ACTIVE) Button(enabled=!busy,shape=Ui.Field,onClick={change(order.copy(orderStatus=OrderStatus.READY_FOR_PICKUP,updatedAt=System.currentTimeMillis()))}) {Text("Ready for pickup")}
-                if(order.orderStatus==OrderStatus.READY_FOR_PICKUP) {Button(onClick=complete,enabled=!busy,shape=Ui.Field) {Text("Complete")};OutlinedButton(onClick={sharing=true},shape=Ui.Field) {Icon(DaymarkIcons.Chat,null,Modifier.size(18.dp),tint=Ui.WhatsApp);Spacer(Modifier.width(6.dp));Text("WhatsApp")}}
+                if(order.orderStatus==OrderStatus.READY_FOR_PICKUP) {Button(onClick=complete,enabled=!busy,shape=Ui.Field) {Text("Complete")};OutlinedButton(onClick={sharing=true},shape=Ui.Field) {Icon(AppIcons.Chat,null,Modifier.size(18.dp),tint=Ui.WhatsApp);Spacer(Modifier.width(6.dp));Text("WhatsApp")}}
                 OutlinedButton(onClick=reorder,enabled=!busy,shape=Ui.Field) {Text("Repeat order")}
                 if(order.orderStatus==OrderStatus.ACTIVE) TextButton(onClick=cancel,enabled=!busy) {Text("Cancel order",color=MaterialTheme.colorScheme.error)}
             }}

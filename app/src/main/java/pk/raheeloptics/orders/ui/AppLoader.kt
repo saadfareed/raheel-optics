@@ -22,7 +22,7 @@ import androidx.lifecycle.compose.currentStateAsState
 
 /** Vector motion only; no GIF, bitmap frames or animation dependency. */
 @Composable
-fun DaymarkLoader(modifier:Modifier=Modifier,color:Color=MaterialTheme.colorScheme.primary,label:String="Loading") {
+fun AppLoader(modifier:Modifier=Modifier,color:Color=MaterialTheme.colorScheme.primary,label:String="Loading") {
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val scope=rememberCoroutineScope()
     val motionScale=scope.coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f
@@ -52,7 +52,7 @@ fun DaymarkLoader(modifier:Modifier=Modifier,color:Color=MaterialTheme.colorSche
 @Composable
 fun LogoLoader(modifier:Modifier=Modifier,label:String="Loading",ring:androidx.compose.ui.unit.Dp=88.dp) {
     androidx.compose.foundation.layout.Box(modifier,contentAlignment=androidx.compose.ui.Alignment.Center) {
-        DaymarkLoader(Modifier.size(ring),label=label)
+        AppLoader(Modifier.size(ring),label=label)
         BrandLogo(Modifier.size(ring*.62f))
     }
 }

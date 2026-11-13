@@ -2,7 +2,7 @@ package pk.raheeloptics.orders
 
 import pk.raheeloptics.orders.data.WorkspaceFiles
 import android.app.Application
-import pk.raheeloptics.orders.data.TodoStore
+import pk.raheeloptics.orders.data.OrderStore
 import pk.raheeloptics.orders.data.appSchema
 import com.powersync.PowerSyncDatabase
 import com.powersync.DatabaseDriverFactory
@@ -16,7 +16,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
+class RaheelApp : Application(), ReminderEnvironment, SyncEnvironment {
     override val scope = CoroutineScope(SupervisorJob()+Dispatchers.IO)
     lateinit var sessions: SessionStore
     lateinit var updates: pk.raheeloptics.orders.updates.UpdateController
@@ -24,7 +24,7 @@ class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
     lateinit var auth: AuthClient
     lateinit var onboarding: pk.raheeloptics.orders.onboarding.OnboardingStore
     override lateinit var reminders: ReminderScheduler
-    private var store: TodoStore?=null
+    private var store: OrderStore?=null
     private val lock=Mutex()
     private val syncLock=Mutex()
     private val reminderLock=Mutex()
@@ -49,7 +49,7 @@ class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
         branding=pk.raheeloptics.orders.branding.BrandingController(this,auth,config.supabaseUrl)
         updates=pk.raheeloptics.orders.updates.UpdateController(this, auth)
     }
-    override suspend fun workspace(): TodoStore? = lock.withLock {
+    override suspend fun workspace(): OrderStore? = lock.withLock {
         recoverPendingErasures()
         val session=sessions.session() ?: return@withLock null
         sessions.bindGuestTransfer(session)
@@ -59,7 +59,7 @@ class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
         val filename=WorkspaceFiles.forKey(key)
         sessions.rememberWorkspace(session,filename)
         val db=PowerSyncDatabase(DatabaseDriverFactory(this),appSchema,dbFilename=filename)
-        TodoStore(db,session.userId,session.localOnly,pk.raheeloptics.orders.data.CachePolicy(BuildConfig.HISTORY_CACHE_DAYS,BuildConfig.HISTORY_CACHE_ENTRIES,BuildConfig.HISTORY_CACHE_BYTES.toLong()),availableBytes={android.os.StatFs(filesDir.absolutePath).availableBytes}).also { store=it; workspaceKey=key }
+        OrderStore(db,session.userId,session.localOnly,pk.raheeloptics.orders.data.CachePolicy(BuildConfig.HISTORY_CACHE_DAYS,BuildConfig.HISTORY_CACHE_ENTRIES,BuildConfig.HISTORY_CACHE_BYTES.toLong()),availableBytes={android.os.StatFs(filesDir.absolutePath).availableBytes}).also { store=it; workspaceKey=key }
     }
     suspend fun maintainCache() = withTimeout(10000) {syncLock.withLock {workspace()?.reconcile()}}
     override suspend fun hasSyncWork():Boolean = syncLock.withLock { workspace()?.needsExchange()==true || sessions.session()?.let {sessions.guestTransferOwnedBy(it)}==true }
@@ -89,12 +89,12 @@ class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
         refreshReminders()
     }
     /** Runs under syncLock. Source survives until all tasks are durably queued in the destination. */
-    private suspend fun transferGuestTasks(destination:TodoStore):Boolean {
+    private suspend fun transferGuestTasks(destination:OrderStore):Boolean {
         val session=sessions.session() ?: return false
         if(!sessions.guestTransferOwnedBy(session)) return false
         val db=PowerSyncDatabase(DatabaseDriverFactory(this),appSchema,dbFilename=WorkspaceFiles.forKey("local-device"))
         try {
-            val source=TodoStore(db,"local-device",true)
+            val source=OrderStore(db,"local-device",true)
             val page=source.guestTransferPage(sessions.guestTransferCursor())
             var pageComplete=true
             var wrote=false
@@ -112,7 +112,7 @@ class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
         } finally {db.close()}
     }
 
-    override suspend fun <T> withReminderWorkspace(action:suspend (TodoStore?)->T):T =
+    override suspend fun <T> withReminderWorkspace(action:suspend (OrderStore?)->T):T =
         reminderLock.withLock { action(workspace()) }
 
     override suspend fun refreshReminders() = withContext(Dispatchers.IO) {
@@ -120,7 +120,7 @@ class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
             val workspace=workspace() ?: return@withLock
             val more=workspace.deliverDueTaskAlerts(reminders::notifyAlerts)
             reminders.reconcileSchedules(workspace.accountId,workspace.notificationSchedules())
-            if(more) pk.raheeloptics.orders.reminders.enqueueReminderContinuation(this@DaymarkApp)
+            if(more) pk.raheeloptics.orders.reminders.enqueueReminderContinuation(this@RaheelApp)
         }}
     }
     suspend fun deleteAccount(currentPassword: String) = withContext(NonCancellable) { syncLock.withLock {
@@ -136,9 +136,9 @@ class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
             val session=sessions.sessionForRevocation()
             val current=workspaceKey?.let(WorkspaceFiles::forKey)
             if(session!=null) for(filename in sessions.retainedWorkspaces(session)) if(filename!=current) {
-                val other=PowerSyncDatabase(DatabaseDriverFactory(this@DaymarkApp),appSchema,dbFilename=filename)
+                val other=PowerSyncDatabase(DatabaseDriverFactory(this@RaheelApp),appSchema,dbFilename=filename)
                 try {
-                    check(TodoStore(other,session.userId,session.localOnly).storageStats().queuedOperations==0L) {"A retained workspace has pending changes. Reopen and sync it before clearing device data."}
+                    check(OrderStore(other,session.userId,session.localOnly).storageStats().queuedOperations==0L) {"A retained workspace has pending changes. Reopen and sync it before clearing device data."}
                 } finally {other.close()}
             }
         }
@@ -161,15 +161,15 @@ class DaymarkApp : Application(), ReminderEnvironment, SyncEnvironment {
         pk.raheeloptics.orders.core.finishSignOut(
             { sessions.clear() },
             { store=null; workspaceKey=null; syncOnline.value=false;syncProblem.value=null },
-            { androidx.work.WorkManager.getInstance(this@DaymarkApp).cancelUniqueWork("todo-sync") },
-            { androidx.work.WorkManager.getInstance(this@DaymarkApp).cancelUniqueWork("todo-periodic-sync") },
+            { androidx.work.WorkManager.getInstance(this@RaheelApp).cancelUniqueWork("todo-sync") },
+            { androidx.work.WorkManager.getInstance(this@RaheelApp).cancelUniqueWork("todo-periodic-sync") },
             { reminders.cancelAll() },
             {
                 if(deleteData) {
                     closing?.db?.disconnectAndClear(clearLocal=true)
                     currentName?.let {sessions.finishErasure(it)}
                     for(filename in retained) if(filename!=currentName) {
-                        val other=PowerSyncDatabase(DatabaseDriverFactory(this@DaymarkApp),appSchema,dbFilename=filename)
+                        val other=PowerSyncDatabase(DatabaseDriverFactory(this@RaheelApp),appSchema,dbFilename=filename)
                         try {other.disconnectAndClear(clearLocal=true)} finally {other.close()}
                         sessions.finishErasure(filename)
                     }

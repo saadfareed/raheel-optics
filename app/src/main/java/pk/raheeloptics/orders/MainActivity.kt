@@ -7,7 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.mutableStateOf
-import pk.raheeloptics.orders.ui.DaymarkScreen
+import pk.raheeloptics.orders.ui.AppRoot
 
 class MainActivity : ComponentActivity() {
     private val target=mutableStateOf<String?>(null)
@@ -25,11 +25,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState); enableEdgeToEdge()
         target.value=intent.getStringExtra("todo")
-        (application as DaymarkApp).scope.launch { (application as DaymarkApp).branding.refresh() }
+        (application as RaheelApp).scope.launch { (application as RaheelApp).branding.refresh() }
         setContent {
-            pk.raheeloptics.orders.ui.DaymarkTheme {
-                pk.raheeloptics.orders.updates.UpdateGate((application as DaymarkApp).updates) {
-                    DaymarkScreen(target.value,consumeTarget={ target.value=null })
+            pk.raheeloptics.orders.ui.AppTheme {
+                pk.raheeloptics.orders.updates.UpdateGate((application as RaheelApp).updates) {
+                    AppRoot(target.value,consumeTarget={ target.value=null })
                 }
             }
         }

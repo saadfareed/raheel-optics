@@ -18,7 +18,7 @@ class CustomerDirectoryStoreTest {
         val filename="customer-directory-${UUID.randomUUID()}.db"
         val db=PowerSyncDatabase(DatabaseDriverFactory(context),appSchema,dbFilename=filename)
         try {
-            val store=TodoStore(db,"directory-test",true)
+            val store=OrderStore(db,"directory-test",true)
             repeat(28) {index ->
                 val order=Order(UUID.randomUUID().toString(),"Ayesha",customerMobile="03001234567",normalizedMobile="+923001234567",orderedAt=100L+index,
                     amounts=OrderAmounts(framePaisa=1000),prescription=Prescription(distanceRight=EyePrescription(sphere="-${index}.00")))

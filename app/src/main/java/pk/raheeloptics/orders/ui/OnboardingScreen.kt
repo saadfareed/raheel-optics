@@ -64,7 +64,7 @@ fun OnboardingScreen(busy:Boolean,error:String?,onFinish:()->Unit) {
                 Row(Modifier.widthIn(max=460.dp).fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     if(page>0) OutlinedButton(onClick={page--},enabled=!busy,shape=Ui.Field,modifier=Modifier.heightIn(min=52.dp)) {Text("Back")}
                     Button(onClick={if(page==2) onFinish() else page++},enabled=!busy,modifier=Modifier.weight(1f).heightIn(min=52.dp),shape=Ui.Field) {
-                        if(busy) {DaymarkLoader(Modifier.size(20.dp),MaterialTheme.colorScheme.onPrimary,"Saving introduction");Spacer(Modifier.width(12.dp))}
+                        if(busy) {AppLoader(Modifier.size(20.dp),MaterialTheme.colorScheme.onPrimary,"Saving introduction");Spacer(Modifier.width(12.dp))}
                         Text(if(page==2) "Let's begin" else "Next")
                     }
                 }
@@ -96,12 +96,12 @@ fun OnboardingScreen(busy:Boolean,error:String?,onFinish:()->Unit) {
                 when(step) {
                     0 -> {
                         Row(verticalAlignment=Alignment.CenterVertically) {
-                            Icon(DaymarkIcons.Event,null,tint=violet)
+                            Icon(AppIcons.Event,null,tint=violet)
                             Spacer(Modifier.width(8.dp));Text("New optical order",fontWeight=FontWeight.Bold)
                         }
                         Surface(shape=RoundedCornerShape(22.dp),color=paper,shadowElevation=2.dp) {
                             Row(Modifier.fillMaxWidth().padding(16.dp),verticalAlignment=Alignment.CenterVertically) {
-                                Icon(DaymarkIcons.Person,null,tint=violet,modifier=Modifier.size(40.dp).clickable {done=!done}.semantics {contentDescription="Open sample customer"})
+                                Icon(AppIcons.Person,null,tint=violet,modifier=Modifier.size(40.dp).clickable {done=!done}.semantics {contentDescription="Open sample customer"})
                                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
                                     Text("Ayesha Khan",fontWeight=FontWeight.SemiBold)
                                     Text(if(done) "OD −4.00 · OS −5.00" else "0300 1234567 · RO-0001",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -109,12 +109,12 @@ fun OnboardingScreen(busy:Boolean,error:String?,onFinish:()->Unit) {
                             }
                         }
                         Row(horizontalArrangement=Arrangement.spacedBy(8.dp),verticalAlignment=Alignment.CenterVertically) {
-                            Icon(if(done) DaymarkIcons.CheckCircle else DaymarkIcons.RadioButtonUnchecked,null,tint=if(done) mint else violet)
+                            Icon(if(done) AppIcons.CheckCircle else AppIcons.RadioButtonUnchecked,null,tint=if(done) mint else violet)
                             Text(if(done) "Prescription saved" else "Tap to preview prescription",color=if(done) mint else violet,style=MaterialTheme.typography.labelLarge)
                         }
                     }
                     1 -> {
-                        Icon(DaymarkIcons.NotificationsActive,null,tint=violet,modifier=Modifier.size(40.dp))
+                        Icon(AppIcons.NotificationsActive,null,tint=violet,modifier=Modifier.size(40.dp))
                         Text("Promised-date reminder",fontWeight=FontWeight.SemiBold,style=MaterialTheme.typography.titleLarge)
                         FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {
                             listOf(10,30,60).forEach {minutes ->
@@ -123,7 +123,7 @@ fun OnboardingScreen(busy:Boolean,error:String?,onFinish:()->Unit) {
                         }
                         Surface(shape=RoundedCornerShape(20.dp),color=paper,shadowElevation=2.dp) {
                             Row(Modifier.fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalAlignment=Alignment.CenterVertically) {
-                                Icon(DaymarkIcons.Alarm,null,tint=mint)
+                                Icon(AppIcons.Alarm,null,tint=mint)
                                 Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
                                     Text("Ayesha Khan · RO-0001",fontWeight=FontWeight.SemiBold)
                                     Text("${if(reminder==60) "1 hour" else "$reminder minutes"} before promised time",color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
@@ -142,7 +142,7 @@ fun OnboardingScreen(busy:Boolean,error:String?,onFinish:()->Unit) {
                             }
                         }
                         Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                            Icon(DaymarkIcons.History,null,tint=mint)
+                            Icon(AppIcons.History,null,tint=mint)
                             Text("Ready orders can notify customers",style=MaterialTheme.typography.bodyMedium)
                         }
                         OutlinedButton(onClick={finalTask=!finalTask},modifier=Modifier.fillMaxWidth()) {Text(if(finalTask) "Reset preview" else "Mark sample order ready")}

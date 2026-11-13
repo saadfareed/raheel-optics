@@ -15,7 +15,7 @@ class OrderListRulesTest {
     @Test fun orderSortingUsesOrderDateRatherThanLastEdit() {
         val old=Order("old","A",orderedAt=100,updatedAt=900)
         val recent=Order("recent","B",orderedAt=200,updatedAt=300)
-        assertTrue(ListRules.sortKey(recent,TodoSort.Newest)<ListRules.sortKey(old,TodoSort.Newest))
-        assertTrue(ListRules.sortKey(old,TodoSort.Oldest)<ListRules.sortKey(recent,TodoSort.Oldest))
+        assertTrue(ListRules.sortKey(recent,OrderSort.Newest)<ListRules.sortKey(old,OrderSort.Newest))
+        assertTrue(ListRules.sortKey(old,OrderSort.Oldest)<ListRules.sortKey(recent,OrderSort.Oldest))
     }
 }

@@ -29,13 +29,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
-import pk.raheeloptics.orders.data.TodoStore
+import pk.raheeloptics.orders.data.OrderStore
 
 interface ReminderEnvironment {
     val scope: CoroutineScope
     val reminders: ReminderScheduler
-    suspend fun workspace(): TodoStore?
-    suspend fun <T> withReminderWorkspace(action:suspend (TodoStore?)->T):T
+    suspend fun workspace(): OrderStore?
+    suspend fun <T> withReminderWorkspace(action:suspend (OrderStore?)->T):T
 }
 
 fun enqueueReminderContinuation(context:Context) {

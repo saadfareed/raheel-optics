@@ -7,8 +7,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.work.WorkManager
 import pk.raheeloptics.orders.core.Order
 import pk.raheeloptics.orders.identity.*
-import pk.raheeloptics.orders.ui.DaymarkScreen
-import pk.raheeloptics.orders.ui.DaymarkTheme
+import pk.raheeloptics.orders.ui.AppRoot
+import pk.raheeloptics.orders.ui.AppTheme
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
@@ -31,7 +31,7 @@ class SignedInReplayTest {
         assumeTrue("Requires isolated QA credentials",context.packageName.endsWith(".qa") && fixture.exists())
         val credentials=Json.parseToJsonElement(fixture.readText()).jsonObject
         fixture.delete()
-        val app=context.applicationContext as DaymarkApp
+        val app=context.applicationContext as RaheelApp
         val originalAuth=app.auth
         val offline=AtomicBoolean(false)
         val sent=AtomicInteger(0)
@@ -51,7 +51,7 @@ class SignedInReplayTest {
         }
         try {
             app.logout();app.sessions.finishGuestTransfer();app.onboarding.complete();app.auth=AuthClient(app.sessions,transport)
-            compose.setContent {DaymarkTheme {DaymarkScreen(null,{})}}
+            compose.setContent {AppTheme {AppRoot(null,{})}}
             compose.waitUntil(15000) {compose.onAllNodesWithText("Email").fetchSemanticsNodes().isNotEmpty()}
             compose.onNodeWithText("Email").performTextInput(credentials["email"]!!.jsonPrimitive.content)
             compose.onNodeWithText("Password").performTextInput(credentials["password"]!!.jsonPrimitive.content)

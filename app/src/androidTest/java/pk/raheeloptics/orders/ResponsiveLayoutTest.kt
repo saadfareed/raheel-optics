@@ -14,8 +14,8 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import pk.raheeloptics.orders.identity.Session
-import pk.raheeloptics.orders.ui.DaymarkScreen
-import pk.raheeloptics.orders.ui.DaymarkTheme
+import pk.raheeloptics.orders.ui.AppRoot
+import pk.raheeloptics.orders.ui.AppTheme
 import pk.raheeloptics.orders.ui.SplashScreen
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -27,7 +27,7 @@ import org.junit.Test
 class ResponsiveLayoutTest {
     @get:Rule val compose=createComposeRule()
     private val context get()=InstrumentationRegistry.getInstrumentation().targetContext
-    private val app get()=context.applicationContext as DaymarkApp
+    private val app get()=context.applicationContext as RaheelApp
 
     @Before fun prepare()=runBlocking {
         app.logout()
@@ -40,7 +40,7 @@ class ResponsiveLayoutTest {
         compose.setContent {
             val density=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,2f)) {
-                DaymarkTheme {Box(Modifier.width(320.dp).fillMaxHeight()) {DaymarkScreen(null,{})}}
+                AppTheme {Box(Modifier.width(320.dp).fillMaxHeight()) {AppRoot(null,{})}}
             }
         }
     }
@@ -90,7 +90,7 @@ class ResponsiveLayoutTest {
         compose.setContent {
             val density=LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density,2f)) {
-                DaymarkTheme {Box(Modifier.width(320.dp).height(240.dp)) {SplashScreen()}}
+                AppTheme {Box(Modifier.width(320.dp).height(240.dp)) {SplashScreen()}}
             }
         }
         capture("splash-font200-short")

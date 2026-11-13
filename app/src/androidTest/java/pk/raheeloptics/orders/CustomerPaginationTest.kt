@@ -7,7 +7,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import pk.raheeloptics.orders.core.*
 import pk.raheeloptics.orders.identity.Session
 import pk.raheeloptics.orders.identity.SessionStore
-import pk.raheeloptics.orders.ui.TodoViewModel
+import pk.raheeloptics.orders.ui.OrdersViewModel
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Rule
@@ -23,18 +23,18 @@ class CustomerPaginationTest {
             val context=InstrumentationRegistry.getInstrumentation().targetContext
             SessionStore(context).save(Session("local-device","","","",Long.MAX_VALUE,true))
             // A fresh install shows the introduction first; these tests start from the app itself.
-            kotlinx.coroutines.runBlocking {(context.applicationContext as DaymarkApp).onboarding.complete()}
+            kotlinx.coroutines.runBlocking {(context.applicationContext as RaheelApp).onboarding.complete()}
         }
     }
     @get:Rule val rules:RuleChain=RuleChain.outerRule(guest).around(compose)
 
     @Test fun customersAppendTwentyFivePerLoadMoreAndResetOnSearch() {
-        lateinit var model:TodoViewModel
-        compose.runOnUiThread {model=ViewModelProvider(compose.activity)[TodoViewModel::class.java]}
+        lateinit var model:OrdersViewModel
+        compose.runOnUiThread {model=ViewModelProvider(compose.activity)[OrdersViewModel::class.java]}
         compose.waitUntil(40000) {!model.state.value.loading && !model.state.value.busy}
         compose.runOnUiThread {model.loadDemoData()}
         compose.waitUntil(60000) {model.state.value.message?.contains("demo",ignoreCase=true) == true && !model.state.value.busy}
-        val total=runBlocking {(compose.activity.application as DaymarkApp).workspace()!!.customerDirectory(CustomerDirectoryQuery(loaded=100)).size}
+        val total=runBlocking {(compose.activity.application as RaheelApp).workspace()!!.customerDirectory(CustomerDirectoryQuery(loaded=100)).size}
         assertTrue("demo data supplies more than one page of customers ($total)",total>ListRules.PageSize+5)
 
         compose.runOnUiThread {model.updateCustomers(CustomerDirectoryQuery())}
@@ -56,8 +56,8 @@ class CustomerPaginationTest {
     }
 
     @Test fun loadMoreButtonOnTheCustomersScreenShowsTheNextPage() {
-        lateinit var model:TodoViewModel
-        compose.runOnUiThread {model=ViewModelProvider(compose.activity)[TodoViewModel::class.java]}
+        lateinit var model:OrdersViewModel
+        compose.runOnUiThread {model=ViewModelProvider(compose.activity)[OrdersViewModel::class.java]}
         compose.waitUntil(40000) {!model.state.value.loading && !model.state.value.busy}
         compose.runOnUiThread {model.loadDemoData()}
         compose.waitUntil(60000) {model.state.value.message?.contains("demo",ignoreCase=true) == true && !model.state.value.busy}

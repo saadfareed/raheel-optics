@@ -3,9 +3,9 @@ package pk.raheeloptics.orders.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import pk.raheeloptics.orders.DaymarkApp
+import pk.raheeloptics.orders.RaheelApp
 import pk.raheeloptics.orders.core.*
-import pk.raheeloptics.orders.data.TodoStore
+import pk.raheeloptics.orders.data.OrderStore
 import pk.raheeloptics.orders.data.OpticalStore
 import pk.raheeloptics.orders.identity.*
 import pk.raheeloptics.orders.sync.enqueueSync
@@ -29,7 +29,7 @@ data class UiState(
     val codeIsReset: Boolean = false,
     val online: Boolean = false,
     val syncProblem: String? = null,
-    val query: TodoQuery = TodoQuery(view=OrderView.ACTIVE),
+    val query: OrderQuery = OrderQuery(view=OrderView.ACTIVE),
     val todos: List<Order> = emptyList(),
     val todosMore: Boolean = false,
     val conflictPageNumber: Int = 1,
@@ -50,8 +50,8 @@ data class UiState(
 )
 
 @OptIn(kotlinx.coroutines.FlowPreview::class)
-class TodoViewModel(application: Application) : AndroidViewModel(application) {
-    private val app=application as DaymarkApp
+class OrdersViewModel(application: Application) : AndroidViewModel(application) {
+    private val app=application as RaheelApp
     private val mutable=MutableStateFlow(UiState())
     val state=mutable.asStateFlow()
     private var observers: Job?=null
@@ -59,8 +59,8 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
     private var orderAnalyticsJob:Job?=null
     private var analyticsGeneration=0
     private var conflictOffset=0
-    private var store: TodoStore?=null
-    private var pendingImport: Pair<TodoStore,TaskImportPreview>?=null
+    private var store: OrderStore?=null
+    private var pendingImport: Pair<OrderStore,TaskImportPreview>?=null
     private val refreshLock=Mutex()
     private val json=Json { ignoreUnknownKeys=true }
     private var todoPages=CursorPages()
@@ -442,7 +442,7 @@ class TodoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun updateQuery(query:TodoQuery) {
+    fun updateQuery(query:OrderQuery) {
         if(mutable.value.query==query) return
         todoJob?.cancel()
         todoCursor=null

@@ -5,7 +5,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import pk.raheeloptics.orders.core.*
-import pk.raheeloptics.orders.ui.TodoEditor
+import pk.raheeloptics.orders.ui.OrderEditor
 import org.junit.Rule
 import org.junit.Test
 import org.junit.Assert.*
@@ -33,7 +33,7 @@ class OrderEditorUiTest {
     @Test fun fixedSaveButtonCreatesAnOrderWithoutOptionalPrescriptionFields() {
         var saved:Order?=null
         compose.setContent {MaterialTheme(colorScheme=darkColorScheme()) {
-            TodoEditor(null,false,null,{}) {saved=it}
+            OrderEditor(null,false,null,{}) {saved=it}
         }}
         compose.onNodeWithText("Save order").assertIsDisplayed()
         compose.onNodeWithText("Customer name").performTextInput("Repair Demo")

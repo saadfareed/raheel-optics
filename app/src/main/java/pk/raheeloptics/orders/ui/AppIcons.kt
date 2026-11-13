@@ -6,7 +6,7 @@ import androidx.compose.ui.res.vectorResource
 import pk.raheeloptics.orders.R
 
 /** Only the vectors used by this app; avoid packaging an entire icon catalogue. */
-internal object DaymarkIcons {
+internal object AppIcons {
     val Download:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ic_ui_download)
     val Upload:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ic_ui_upload)
     val Info:ImageVector @Composable get()=ImageVector.vectorResource(R.drawable.ic_ui_info)

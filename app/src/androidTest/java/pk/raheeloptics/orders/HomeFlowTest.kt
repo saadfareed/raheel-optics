@@ -19,7 +19,7 @@ class HomeFlowTest {
             val context=InstrumentationRegistry.getInstrumentation().targetContext
             SessionStore(context).save(Session("local-device","","","",Long.MAX_VALUE,true))
             // A fresh install shows the introduction first; these tests start from the app itself.
-            kotlinx.coroutines.runBlocking {(context.applicationContext as DaymarkApp).onboarding.complete()}
+            kotlinx.coroutines.runBlocking {(context.applicationContext as RaheelApp).onboarding.complete()}
         }
     }
     @get:Rule val rules:RuleChain=RuleChain.outerRule(guest).around(compose)

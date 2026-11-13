@@ -15,7 +15,7 @@ data class CachePolicy(val days:Int=30,val entries:Int=300,val bytes:Long=2L*102
 data class StorageStats(val allocatedBytes:Long,val reusableBytes:Long,val historyBytes:Long,val historyEntries:Long,val queuedOperations:Long,val activeTasks:Long=0,val deviceTaskLimit:Int=10000,val cloudTaskLimit:Int?=null,val quotaReceivedAt:Long?=null,val cloudResources:ResourceLimits?=null,val quarantinedChanges:Long=0)
 data class AdmissionPolicy(val tasks:Int=10000,val pendingOperations:Int=5000,val localHistoryEvents:Int=100000,val minFreeBytes:Long=16L*1024*1024)
 
-class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly: Boolean, private val cachePolicy:CachePolicy=CachePolicy(), private val admission:AdmissionPolicy=AdmissionPolicy(), private val availableBytes:()->Long={Long.MAX_VALUE}) {
+class OrderStore(val db: PowerSyncDatabase, val accountId: String, val localOnly: Boolean, private val cachePolicy:CachePolicy=CachePolicy(), private val admission:AdmissionPolicy=AdmissionPolicy(), private val availableBytes:()->Long={Long.MAX_VALUE}) {
     suspend fun storageStats():StorageStats {
         val pageSize=db.get("PRAGMA page_size") {it.getLong(0)!!}
         val pages=db.get("PRAGMA page_count") {it.getLong(0)!!}
@@ -382,8 +382,8 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
         }
     }
 
-    suspend fun todoPage(query: TodoQuery = TodoQuery(), cursor: ListCursor? = null, limit: Int = ListRules.PageSize,
-                         now: Long = System.currentTimeMillis(), zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): TodoPage {
+    suspend fun todoPage(query: OrderQuery = OrderQuery(), cursor: ListCursor? = null, limit: Int = ListRules.PageSize,
+                         now: Long = System.currentTimeMillis(), zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): OrderPage {
         require(limit > 0 && limit < Int.MAX_VALUE)
         val (start, end) = ListRules.timeBounds(now, zone)
         val weekEnd = java.time.Instant.ofEpochMilli(now).atZone(zone).toLocalDate().plusDays(7).atStartOfDay(zone).toInstant().toEpochMilli()
@@ -418,22 +418,22 @@ class TodoStore(val db: PowerSyncDatabase, val accountId: String, val localOnly:
             DeadlineFilter.None -> where += "json_extract(body,'$.dueAt') IS NULL"
         }
         val sort = when(query.sort) {
-            TodoSort.Deadline -> "coalesce(json_extract(body,'$.dueAt'),9223372036854775807)"
-            TodoSort.LatestDeadline -> "coalesce(-json_extract(body,'$.dueAt'),9223372036854775807)"
-            TodoSort.Latest -> "-coalesce(json_extract(body,'$.updatedAt'),0)"
-            TodoSort.Newest -> "-coalesce(json_extract(body,'$.orderedAt'),0)"
-            TodoSort.Oldest -> "coalesce(json_extract(body,'$.orderedAt'),0)"
-            TodoSort.CustomerName -> "lower(coalesce(json_extract(body,'$.title'),''))"
-            TodoSort.Balance -> "-max(0,($total)-($paid))"
-            TodoSort.Priority -> "CASE coalesce(json_extract(body,'$.priority'),'Medium') WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 ELSE 2 END"
+            OrderSort.Deadline -> "coalesce(json_extract(body,'$.dueAt'),9223372036854775807)"
+            OrderSort.LatestDeadline -> "coalesce(-json_extract(body,'$.dueAt'),9223372036854775807)"
+            OrderSort.Latest -> "-coalesce(json_extract(body,'$.updatedAt'),0)"
+            OrderSort.Newest -> "-coalesce(json_extract(body,'$.orderedAt'),0)"
+            OrderSort.Oldest -> "coalesce(json_extract(body,'$.orderedAt'),0)"
+            OrderSort.CustomerName -> "lower(coalesce(json_extract(body,'$.title'),''))"
+            OrderSort.Balance -> "-max(0,($total)-($paid))"
+            OrderSort.Priority -> "CASE coalesce(json_extract(body,'$.priority'),'Medium') WHEN 'High' THEN 0 WHEN 'Medium' THEN 1 ELSE 2 END"
         }
-        if(cursor != null) { where += "($sort,id)>(?,?)"; args += if(query.sort==TodoSort.CustomerName) cursor.textValue ?: "" else cursor.value; args += cursor.id }
+        if(cursor != null) { where += "($sort,id)>(?,?)"; args += if(query.sort==OrderSort.CustomerName) cursor.textValue ?: "" else cursor.value; args += cursor.id }
         args += limit + 1
         val rows = db.getAll("""
             WITH effective AS ($allOrders) SELECT body,$opticalStatus,($sort) FROM effective WHERE ${where.joinToString(" AND ")} ORDER BY $sort,id LIMIT ?
-        """.trimIndent(), args) { json.decodeFromString<Order>(it.getString(0)!!).copy(orderStatus=OrderStatus.valueOf(it.getString(1)!!)) to if(query.sort==TodoSort.CustomerName) it.getString(2) else null }
+        """.trimIndent(), args) { json.decodeFromString<Order>(it.getString(0)!!).copy(orderStatus=OrderStatus.valueOf(it.getString(1)!!)) to if(query.sort==OrderSort.CustomerName) it.getString(2) else null }
         val page = rows.take(limit)
-        return TodoPage(page.map {it.first}, if(rows.size > limit) page.last().let {(order,textKey) -> ListCursor(ListRules.sortKey(order,query.sort),order.id,textKey) } else null)
+        return OrderPage(page.map {it.first}, if(rows.size > limit) page.last().let {(order,textKey) -> ListCursor(ListRules.sortKey(order,query.sort),order.id,textKey) } else null)
     }
 
 

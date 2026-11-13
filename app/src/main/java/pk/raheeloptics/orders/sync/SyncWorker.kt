@@ -2,7 +2,7 @@ package pk.raheeloptics.orders.sync
 
 import android.content.Context
 import androidx.work.*
-import pk.raheeloptics.orders.data.TodoStore
+import pk.raheeloptics.orders.data.OrderStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,7 +16,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import java.util.concurrent.TimeUnit
 
 interface SyncEnvironment {
-    suspend fun workspace(): TodoStore?
+    suspend fun workspace(): OrderStore?
     suspend fun hasSyncWork():Boolean
     suspend fun connect()
     suspend fun refreshReminders()

@@ -32,7 +32,7 @@ class SplashThemeTest {
                 else lightColorScheme(background=lightBackground)) {SplashScreen()}
         }
         val context=InstrumentationRegistry.getInstrumentation().targetContext
-        val brand=(context.applicationContext as DaymarkApp).branding.state.value.config
+        val brand=(context.applicationContext as RaheelApp).branding.state.value.config
         fun verify(name:String,expected:Color) {
             compose.onNodeWithText(brand.name).assertIsDisplayed()
             compose.onNodeWithText(brand.tagline).assertIsDisplayed()

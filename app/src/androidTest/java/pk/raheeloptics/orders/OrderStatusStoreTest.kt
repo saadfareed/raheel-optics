@@ -18,7 +18,7 @@ class OrderStatusStoreTest {
         val filename="status-test-${UUID.randomUUID()}.db"
         var db=PowerSyncDatabase(DatabaseDriverFactory(context),appSchema,dbFilename=filename)
         try {
-            var store=TodoStore(db,"status-test",true)
+            var store=OrderStore(db,"status-test",true)
             suspend fun create(name:String):Order {
                 val order=Order(UUID.randomUUID().toString(),name)
                 store.save(order,"create",null)
@@ -31,10 +31,10 @@ class OrderStatusStoreTest {
             store.transition(create("Cancel demo"),"delete")
             db.close()
             db=PowerSyncDatabase(DatabaseDriverFactory(context),appSchema,dbFilename=filename)
-            store=TodoStore(db,"status-test",true)
+            store=OrderStore(db,"status-test",true)
             assertEquals(4,store.todoPage().items.size)
             OrderStatus.entries.forEach {status ->
-                assertEquals(status,store.todoPage(TodoQuery(orderStatus=status)).items.single().orderStatus)
+                assertEquals(status,store.todoPage(OrderQuery(orderStatus=status)).items.single().orderStatus)
             }
             val snapshot=store.uiSnapshot(store.todoPage().items,emptyList())
             OrderStatus.entries.forEach {assertEquals(1,snapshot.orderStatusCounts[it])}

@@ -30,7 +30,7 @@ internal val customerProfilesSql = """
 """.trimIndent()
 
 /**
- * Client write path for the optical model, parallel to [TodoStore]. Every mutation runs in ONE
+ * Client write path for the optical model, parallel to [OrderStore]. Every mutation runs in ONE
  * writeTransaction guarded by [writes] + [admit], writing an insert-only operation_requests row keyed
  * by the [OpticalOperation] id (idempotency key), an optical_drafts overlay row, an optical_journal
  * row state='queued', and the synced optical_* rows the client owns. Replaying an op id is a no-op.
@@ -47,7 +47,7 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
     /**
      * Serializes a write and unwraps precondition failures. PowerSync wraps a lambda's throwable in a
      * PowerSyncException; we rethrow our own typed causes (collision, validation) so callers can branch on them
-     * rather than parsing a wrapped message. Mirrors how TodoStore surfaces its guards, in catchable form.
+     * rather than parsing a wrapped message. Mirrors how OrderStore surfaces its guards, in catchable form.
      */
     private suspend fun <T> write(block: (com.powersync.db.internal.PowerSyncTransaction) -> T): T = writes.withLock {
         try {
@@ -57,7 +57,7 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
         }
     }
 
-    // optical_drafts holds both customer and order overlays in one table (mirrors TodoStore's single drafts
+    // optical_drafts holds both customer and order overlays in one table (mirrors OrderStore's single drafts
     // table). Customer drafts key on the customer id, order drafts on the order id; a "kind" discriminator in
     // the serialized body separates them for the snapshot read.
     private val orderBody = """SELECT body FROM optical_drafts WHERE id=? AND json_extract(body,'$.kind')='order'"""
@@ -114,9 +114,9 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
         if(!localOnly) tx.execute("INSERT INTO operation_requests(id,payload) VALUES(?,?)", listOf(op.id, payload))
     }
 
-    // Mirrors TodoStore's cloud path: the client writes the overlay draft only; the synced optical_customers/
+    // Mirrors OrderStore's cloud path: the client writes the overlay draft only; the synced optical_customers/
     // optical_orders rows are populated by the LATER sync task from operation_requests (never written here, just as
-    // TodoStore never writes server_todos). total_paisa stays server-generated; status stays UPPERCASE client-side.
+    // OrderStore never writes server_todos). total_paisa stays server-generated; status stays UPPERCASE client-side.
     private fun writeCustomerDraft(tx: com.powersync.db.internal.PowerSyncTransaction, customer: Customer, opId: String) {
         tx.execute("INSERT OR REPLACE INTO optical_drafts(id,body,operation_id) VALUES(?,?,?)", listOf(customer.id, encodeCustomerDraft(customer), opId))
     }
@@ -217,14 +217,14 @@ class OpticalStore(val db: PowerSyncDatabase, val accountId: String, private val
         }
     }
 
-    /** Mirrors TodoStore.recordResult: records the apply receipt for an op on its journal row. */
+    /** Mirrors OrderStore.recordResult: records the apply receipt for an op on its journal row. */
     suspend fun recordResult(op: OpticalOperation, accepted: Boolean, ackRevision: Long, message: String) {
         db.writeTransaction { tx ->
             tx.execute("UPDATE optical_journal SET state=?,ack_revision=?,message=? WHERE id=?", listOf(if (accepted) "acked" else "conflict", ackRevision, message, op.id))
         }
     }
 
-    /** Mirrors TodoStore.reconcile: evict acked overlays, then acked journal rows no draft still references. */
+    /** Mirrors OrderStore.reconcile: evict acked overlays, then acked journal rows no draft still references. */
     suspend fun reconcile() {
         db.writeTransaction { tx ->
             tx.execute("DELETE FROM optical_drafts WHERE operation_id IN (SELECT id FROM optical_journal WHERE state='acked')")

@@ -43,7 +43,7 @@ class SharedCustomerTest {
         val filename="shared-profile-${UUID.randomUUID()}.db"
         var db=PowerSyncDatabase(DatabaseDriverFactory(context),appSchema,dbFilename=filename)
         try {
-            var store=TodoStore(db,"guest-profile",true)
+            var store=OrderStore(db,"guest-profile",true)
             store.save(order(),"create",null)
             var row=store.customerDirectory(CustomerDirectoryQuery()).single()
             val first=store.todoPage().items.single()
@@ -74,7 +74,7 @@ class SharedCustomerTest {
             store.transition(store.todoPage().items.single {it.id==repeated.id},"complete")
             store.clearLocalHistory()
             db.close();db=PowerSyncDatabase(DatabaseDriverFactory(context),appSchema,dbFilename=filename)
-            store=TodoStore(db,"guest-profile",true)
+            store=OrderStore(db,"guest-profile",true)
             assertEquals(2,store.customerDirectory(CustomerDirectoryQuery()).size)
             assertEquals("Ayesha Updated",store.customerDirectory(CustomerDirectoryQuery(search="Ayesha")).single().customer!!.name)
             assertEquals(0,store.customerDirectory(CustomerDirectoryQuery(search="Ayesha")).single().orderCount)
@@ -87,7 +87,7 @@ class SharedCustomerTest {
         val db=PowerSyncDatabase(DatabaseDriverFactory(context),appSchema,dbFilename=filename)
         try {
             val account=UUID.randomUUID().toString()
-            val store=TodoStore(db,account,false)
+            val store=OrderStore(db,account,false)
             store.save(order(),"create",null)
             val customer=store.customerDirectory(CustomerDirectoryQuery()).single().customer!!
             var missing=true
@@ -113,7 +113,7 @@ class SharedCustomerTest {
         val db=PowerSyncDatabase(DatabaseDriverFactory(context),appSchema,dbFilename=filename)
         try {
             val account=UUID.randomUUID().toString()
-            val store=TodoStore(db,account,false)
+            val store=OrderStore(db,account,false)
             store.save(order(),"create",null)
             val profiles=OpticalStore(db,account)
             val original=store.customerDirectory(CustomerDirectoryQuery()).single().customer!!

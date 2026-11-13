@@ -51,8 +51,8 @@ internal object Ui {
     }
     OutlinedTextField(value=text,onValueChange={text=it.take(maxLength)},modifier=modifier.fillMaxWidth(),singleLine=true,shape=Ui.Field,
         placeholder={Text(placeholder,maxLines=1,overflow=TextOverflow.Ellipsis)},
-        leadingIcon={Icon(DaymarkIcons.Search,null)},
-        trailingIcon={if(text.isNotEmpty()) TipIconButton(DaymarkIcons.Close,"Clear search",{text="";lastSent="";onSearch("")})},
+        leadingIcon={Icon(AppIcons.Search,null)},
+        trailingIcon={if(text.isNotEmpty()) TipIconButton(AppIcons.Close,"Clear search",{text="";lastSent="";onSearch("")})},
         colors=OutlinedTextFieldDefaults.colors(unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant,unfocusedContainerColor=MaterialTheme.colorScheme.surfaceVariant.copy(alpha=.35f)))
 }
 
@@ -78,7 +78,7 @@ internal object Ui {
 @Composable internal fun LoadMoreFooter(visible:Boolean,loading:Boolean,label:String,onClick:()->Unit) {
     if(!visible && !loading) return
     Box(Modifier.fillMaxWidth().padding(vertical=Ui.Tight),contentAlignment=Alignment.Center) {
-        if(loading) DaymarkLoader(Modifier.size(24.dp),label="Loading")
+        if(loading) AppLoader(Modifier.size(24.dp),label="Loading")
         else OutlinedButton(onClick=onClick,shape=Ui.Field,modifier=Modifier.heightIn(min=48.dp)) {Text(label)}
     }
 }
