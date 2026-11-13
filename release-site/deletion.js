@@ -1,7 +1,7 @@
 'use strict';
 const form=document.querySelector('#deletion'), message=document.querySelector('#message');
 form.addEventListener('submit',async event=>{
-  event.preventDefault(); const button=form.querySelector('button'),config=window.DAYMARK;
+  event.preventDefault(); const button=form.querySelector('button'),config=window.RAHEEL_OPTICS;
   if(!config.supabaseUrl?.startsWith('https://') || !config.publicKey){message.textContent='This page is not configured yet.';return;}
   button.disabled=true; message.textContent='Confirming account…';
   const email=form.elements.email.value.trim(),password=form.elements.password.value;
@@ -13,7 +13,7 @@ form.addEventListener('submit',async event=>{
     const session=await response.json(); temporarySession=session.access_token;
     const deletion=await fetch(config.supabaseUrl+'/functions/v1/delete-account',{method:'POST',headers:{apikey:config.publicKey,Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({current_password:password}),cache:'no-store',credentials:'omit',signal:AbortSignal.timeout(45000)});
     if(!deletion.ok) throw new Error('Deletion could not be confirmed. Please try again or contact support.');
-    deleted=true; form.reset(); form.hidden=true; message.textContent='Your account and associated records were removed from the live service. Clear Daymark app storage on other devices to remove their offline copies. Provider backups follow the retention arrangements described in Privacy.';
+    deleted=true; form.reset(); form.hidden=true; message.textContent='Your account and associated records were removed from the live service. Use Settings > Clear device data on other phones to remove their offline copies. Provider backups follow the retention arrangements described in Privacy.';
   } catch(error){message.textContent=error.message;} finally {
     form.elements.password.value='';
     if(temporarySession && !deleted) {

@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.Daymark" parent="Theme.Daymark.Base">
+    <style name="Theme.RaheelOptics" parent="Theme.RaheelOptics.Base">
         <item name="android:windowLightNavigationBar">@bool/light_system_bars</item>
     </style>
 </resources>

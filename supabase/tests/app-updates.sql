@@ -1,6 +1,6 @@
 begin;
 insert into public.app_update_policy(platform, latest_version_code, minimum_version_code, version_name, update_url)
-values ('android', 10, 5, '2.0', 'https://example.com/daymark.apk');
+values ('android', 10, 5, '2.0', 'https://example.com/raheel-optics.apk');
 set local role anon;
 do $$ begin
     if (select count(*) from public.app_update_policy) <> 1 then raise exception 'Signed-out policy unavailable'; end if;

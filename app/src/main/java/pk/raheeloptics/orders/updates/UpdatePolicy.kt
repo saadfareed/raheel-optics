@@ -11,7 +11,7 @@ data class UpdatePolicy(
     val minimum_version_code: Int,
     val version_name: String,
     val update_url: String,
-    val message: String = "A new version of Daymark is available."
+    val message: String = "A new version of Raheel Optics is available."
 ) {
     fun validate(): UpdatePolicy {
         require(minimum_version_code > 0 && latest_version_code >= minimum_version_code)

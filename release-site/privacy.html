@@ -1,22 +1,23 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Daymark privacy</title><link rel="stylesheet" href="style.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Raheel Optics privacy</title><link rel="stylesheet" href="style.css"></head>
 <body><main>
 <h1>Privacy</h1>
-<p>Draft for owner review. Updated 10 October 2026.</p>
-<h2>Cloud accounts and local-only use</h2>
-<p>For a cloud account, Daymark processes your email, authentication information, tasks, notes, deadlines, reminders and task history to provide your account and synchronize your work. Supabase provides cloud authentication and database storage. When authentication email delivery is enabled, the configured mail service processes recipients and account-action messages for authentication emails.</p>
-<p>Local-only task workspaces stay on the device and do not synchronize their tasks to a cloud account. Daymark keeps device copies of cloud tasks and unsynced changes so you can work offline.</p>
+<p>Draft for owner review. Updated 13 November 2026.</p>
+<h2>What the app stores</h2>
+<p>Raheel Optics is an order book for an optical shop. For a cloud account it stores your email and sign-in information, and the shop records you enter: customer names and mobile numbers, eye prescriptions, frame and lens details, prices, payments, order dates, pickup reminders and notes. Supabase provides sign-in and database storage. Sign-up and password-reset codes are sent by email through the shop's configured mail account.</p>
+<p>Guest mode keeps records only on the phone and does not upload them. Signed-in phones keep a copy of the shop's records and unsent changes so the app works offline.</p>
+<h2>Customer information</h2>
+<p>The shop is responsible for the customer information it records and for having a reason to keep it. Customer details are used only to manage orders, prepare invoices and send pickup or balance messages. WhatsApp messages are opened in WhatsApp for the shop to review and send; the app does not send them by itself.</p>
 <h2>Device storage and reminders</h2>
-<p>Task databases use Android app-private storage without separate database encryption. Session credentials use Android Keystore protection. Reminders use Android notifications, subject to device permissions and operating-system restrictions. A reminder inbox entry records processing and does not guarantee notification delivery.</p>
-<p>Daymark uses task history to show completion statistics. The current app includes no advertising or third-party tracking SDKs. Network services may process technical logs for security and operation.</p>
+<p>Records are kept in the app's private storage on the phone. Sign-in credentials are protected by the Android Keystore. Frame photos stay on the phone. Reminders use Android notifications and depend on the phone's notification settings.</p>
+<p>The app contains no advertising or third-party tracking. Release builds send crash reports to Firebase Crashlytics so faults can be fixed; these contain technical details, not customer records. Network services may keep technical logs for security and operation.</p>
 <h2>Retention and deletion</h2>
-<p>Completing or deleting a task changes its state. Cloud task records, history and synchronization receipts remain associated with your account until account deletion. Clearing a device history cache does not erase cloud history. Local-only history can be cleared separately; active tasks and lifetime counts remain.</p>
-<p>Account deletion removes your account and associated records from the live application database. Provider backups and operational logs follow provider and operator retention arrangements. Their retention periods are currently unknown and must be confirmed by the operator before this draft is published.</p>
-<p>Offline copies on other devices are not remotely erased. Normal sign-out preserves device work. Clear Daymark storage on those devices to remove their copies; export work you want to keep first.</p>
+<p>Completed and cancelled orders stay in your account as shop records until you delete the account. Account deletion removes your account and its records from the live database. Provider backups and logs follow the provider's retention arrangements, which the operator must confirm before this page is published.</p>
+<p>Copies on other phones are not erased remotely. Use Settings &gt; Clear device data on those phones, after exporting anything you want to keep.</p>
 <h2>Exports</h2>
-<p>Device exports contain private tasks, notes, cached history and saved change records, including unreadable records retained for recovery. They exclude account credentials. Export files you save elsewhere remain under your control and are not removed by account deletion. An export is not a complete cloud backup.</p>
-<p>You can delete a cloud account in Settings or through the <a href="delete-account.html">account-deletion page</a>.</p>
+<p>Exports contain your shop's orders and customers but not your password. Files you save elsewhere stay under your control and are not removed by account deletion.</p>
+<p>You can delete your account in Settings or on the <a href="delete-account.html">account-deletion page</a>.</p>
 <h2>Contact</h2>
 <p id="contact">Developer identity and support contact must be configured before publication.</p>
 </main><script src="config.js"></script><script src="privacy.js"></script></body>

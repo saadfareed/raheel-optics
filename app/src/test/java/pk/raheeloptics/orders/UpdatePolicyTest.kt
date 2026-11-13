@@ -6,7 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class UpdatePolicyTest {
-    private val policy = UpdatePolicy(10, 5, "2.0", "https://example.com/daymark.apk")
+    private val policy = UpdatePolicy(10, 5, "2.0", "https://example.com/raheel-optics.apk")
     @Test fun playInstallationsUpdateThroughTheirOwnPlayListing() {
         assertEquals("https://play.google.com/store/apps/details?id=pk.raheeloptics.orders",policy.destination("com.android.vending","pk.raheeloptics.orders"))
     }

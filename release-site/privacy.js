@@ -1,5 +1,5 @@
 'use strict';
-const privacyConfig=window.DAYMARK || {},contact=document.querySelector('#contact');
+const privacyConfig=window.RAHEEL_OPTICS || {},contact=document.querySelector('#contact');
 if(contact && privacyConfig.developerName?.trim() && privacyConfig.supportEmail?.trim()) {
   const address=document.createElement('a');
   address.textContent=privacyConfig.supportEmail.trim();

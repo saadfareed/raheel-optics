@@ -21,7 +21,7 @@ class HttpCancellationTest {
         private lateinit var serverContext: SSLContext
         private lateinit var client: OkHttpClient
         @BeforeClass @JvmStatic fun certificate() {
-            directory=Files.createTempDirectory("daymark-https-fixture-")
+            directory=Files.createTempDirectory("https-fixture-")
             val keytool=java.nio.file.Path.of(System.getProperty("java.home"),"bin","keytool").toString()
             val process=ProcessBuilder(keytool,"-genkeypair","-alias","fixture","-keyalg","RSA","-keysize","2048",
                 "-storetype","PKCS12","-keystore",directory.resolve("fixture.p12").toString(),"-storepass","fixture-password",

@@ -46,6 +46,7 @@ class SessionStore(context: Context) : AuthSessionStorage {
     @Volatile private var cachedSession: Pair<String,Session>? = null
     private val key: SecretKey get() {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        // Keystore alias kept from the original app: renaming it would lose the key and sign every user out.
         return (store.getKey("daymark-session", null) as? SecretKey) ?: KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").run {
             init(KeyGenParameterSpec.Builder("daymark-session", KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())

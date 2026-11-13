@@ -28,7 +28,7 @@ fun AppLoader(modifier:Modifier=Modifier,color:Color=MaterialTheme.colorScheme.p
     val motionScale=scope.coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f
     val moving=lifecycle.isAtLeast(Lifecycle.State.STARTED) && motionScale>0f
     val angle=if(moving) {
-        val transition=rememberInfiniteTransition(label="Daymark loading")
+        val transition=rememberInfiniteTransition(label="Loading")
         val rotation by transition.animateFloat(0f,360f,infiniteRepeatable(tween(1100,easing=LinearEasing)),label="Loading orbit")
         rotation
     } else 0f

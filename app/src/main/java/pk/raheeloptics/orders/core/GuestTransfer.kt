@@ -11,6 +11,7 @@ object GuestTransfer {
         fun append(todo:Order,action:String,time:Long) {
             val next=todo.copy(id=id,revision=result.size+1L,updatedAt=time,
                 reminderAt=todo.reminderAt?.takeIf {it>now && todo.status=="active"})
+            // Fixed seed: operation ids must stay identical so an interrupted guest transfer resumes safely.
             val opId=java.util.UUID.nameUUIDFromBytes("daymark-guest-op-v1:$account:${current.id}:${result.size}".toByteArray(Charsets.UTF_8)).toString()
             result+=Operation(opId,next,action,before?.revision ?: 0,result.lastOrNull()?.id,time,before?.status ?: "absent")
             before=next

@@ -1,10 +1,10 @@
-Daymark's ic_ui_* vector drawables are derived from the Material icons distributed
+This app's ic_ui_* vector drawables are derived from the Material icons distributed
 with AndroidX Compose Material Icons 1.7.8, copyright The Android Open Source Project.
 They are licensed under the Apache License, Version 2.0.
 https://www.apache.org/licenses/LICENSE-2.0
 
 The original path geometry and automatic RTL mirroring are retained. Only the 37
-icons used by Daymark are packaged; the full extended icon catalogue is omitted.
+icons used by this app are packaged; the full extended icon catalogue is omitted.
 
 
                                  Apache License

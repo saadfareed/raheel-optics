@@ -23,6 +23,7 @@ object TaskImport {
     private val types = setOf("task", "history", "operation", "localState", "quarantinedChange", "queuedChange","customer","customerOperation")
 
     fun copyId(accountId: String, sourceId: String): String = UUID.nameUUIDFromBytes(
+        // Fixed seed: import ids must stay identical so re-importing a file resumes instead of duplicating.
         "daymark-import-v1:$accountId:$sourceId".toByteArray(Charsets.UTF_8)).toString()
 
     fun preview(input: InputStream): TaskImportPreview {
@@ -45,6 +46,7 @@ object TaskImport {
             val row=json.parseToJsonElement(decoded) as? JsonObject ?: error("Invalid export record.")
             if(!header) {
                 val format=row["format"]?.jsonPrimitive?.content;val version=row["version"]?.jsonPrimitive?.content
+                // Also accepts exports made by builds that still used the original format name.
                 check((format=="daymark-export" && version=="1") || (format=="raheel-optics-export" && version=="2")) {"Unsupported optical export."}
                 header=true
                 return

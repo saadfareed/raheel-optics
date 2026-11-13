@@ -47,7 +47,7 @@ class ReminderScheduler(private val context: Context) {
     private val alarms = context.getSystemService(AlarmManager::class.java)
     private val prefs = context.getSharedPreferences("reminders", Context.MODE_PRIVATE)
     private fun pending(account: String, id: String, time: Long = 0): PendingIntent = PendingIntent.getBroadcast(context, 0,
-        Intent(context, ReminderReceiver::class.java).setData("daymark://reminder/$account/$id".toUri()).putExtra("account",account).putExtra("todo",id.substringAfter(':',id)).putExtra("kind",id.substringBefore(':',"reminder")).putExtra("time",time),
+        Intent(context, ReminderReceiver::class.java).setData("raheel-optics://reminder/$account/$id".toUri()).putExtra("account",account).putExtra("todo",id.substringAfter(':',id)).putExtra("kind",id.substringBefore(':',"reminder")).putExtra("time",time),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     fun reconcile(account: String, todos: List<Order>) {
         reconcileSchedules(account,ReminderPolicy.future(todos,System.currentTimeMillis()).associate { it.id to it.reminderAt!! })
@@ -97,7 +97,7 @@ class ReminderScheduler(private val context: Context) {
         if (!allowed()) return
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel("todos","Task alerts",NotificationManager.IMPORTANCE_DEFAULT))
-        val tap=PendingIntent.getActivity(context,0,Intent(context,MainActivity::class.java).setData("daymark://todo/${todo.id}".toUri()).putExtra("todo",todo.id),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val tap=PendingIntent.getActivity(context,0,Intent(context,MainActivity::class.java).setData("raheel-optics://order/${todo.id}".toUri()).putExtra("todo",todo.id),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         try {
             manager.notify(if(deadline) "deadline:${todo.id}" else todo.id,0,NotificationCompat.Builder(context,"todos").setSmallIcon(R.drawable.ic_notification).setContentTitle(todo.title).setContentText(if(deadline) "Your task deadline is due." else "Your todo reminder is due.").setContentIntent(tap).setAutoCancel(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)

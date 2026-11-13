@@ -7,7 +7,7 @@ function setup(responses){
  const button={},password={value:'fixture-password'},email={value:'fixture@example.invalid'},message={};
  let submit;const calls=[];
  const form={elements:{password,email},querySelector:()=>button,addEventListener:(_,callback)=>submit=callback,reset:()=>{password.value='';email.value='';}};
- const context={AbortSignal,document:{querySelector:selector=>({'#deletion':form,'#message':message})[selector]},window:{DAYMARK:{supabaseUrl:'https://backend.example',publicKey:'public'}},fetch:async(url,options)=>{
+ const context={AbortSignal,document:{querySelector:selector=>({'#deletion':form,'#message':message})[selector]},window:{RAHEEL_OPTICS:{supabaseUrl:'https://backend.example',publicKey:'public'}},fetch:async(url,options)=>{
   assert.equal(password.value,'');calls.push({url,options});const result=responses.shift();if(result instanceof Error)throw result;return result;
  }};
  vm.runInNewContext(source,context);

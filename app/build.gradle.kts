@@ -60,8 +60,8 @@ android {
         buildConfigField("String", "SUPABASE_PUBLIC_KEY", "\"${setting("SUPABASE_PUBLIC_KEY").replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("String", "SUPPORT_EMAIL", "\"${setting("RELEASE_SUPPORT_EMAIL").replace("\\", "\\\\").replace("\"", "\\\"")}\"")
         buildConfigField("String", "PRIVACY_POLICY_URL", "\"${setting("RELEASE_PRIVACY_URL").replace("\\", "\\\\").replace("\"", "\\\"")}\"")
-        resValue("string", "app_name", branding.getProperty("APP_NAME", "Daymark"))
-        resValue("string", "brand_tagline", branding.getProperty("BRAND_TAGLINE", "A little focus. A better day."))
+        resValue("string", "app_name", branding.getProperty("APP_NAME", "Raheel Optics"))
+        resValue("string", "brand_tagline", branding.getProperty("BRAND_TAGLINE", "Clear vision. Personal care."))
         listOf("FOREGROUND_SYNC_SECONDS" to 120..900, "BACKGROUND_SYNC_MINUTES" to 15..1440, "UPDATE_CHECK_SECONDS" to 60..86400,
             "HISTORY_CACHE_DAYS" to 1..90, "HISTORY_CACHE_ENTRIES" to 25..1000,
             "HISTORY_CACHE_BYTES" to 65536..4194304).forEach { (name, bounds) ->
