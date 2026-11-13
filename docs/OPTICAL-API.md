@@ -1,6 +1,6 @@
 # Optical order API (migration 020) — contract for the Android client
 
-Status: migrations 020-023, tested on local PostgreSQL (backend gate + scripts/wire-contract-check.sh). Apply with scripts/apply-migrations.sh.
+Status: applied to Supabase (migrations 020-023). Checked by scripts/backend-gate.sh and scripts/wire-contract-check.sh.
 All functions require an authenticated user and are called as Supabase RPCs (`/rest/v1/rpc/<name>`).
 Money is integer paisa. Times are epoch milliseconds. Status values are `ACTIVE`, `READY_FOR_PICKUP`,
 `COMPLETE`, `CANCEL`. Payment methods: `CASH, CARD, BANK_TRANSFER, JAZZCASH, EASYPAISA, OTHER` (any case on input).
