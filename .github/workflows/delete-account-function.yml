@@ -25,14 +25,11 @@ jobs:
         with:
           node-version: 22
       - run: node --test supabase/functions/delete-account/handler.test.mjs
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
       - name: Deploy
         run: |
           test -n "$SUPABASE_ACCESS_TOKEN" || { echo "::error::Add the SUPABASE_ACCESS_TOKEN secret."; exit 1; }
           test -n "$PROJECT_REF" || { echo "::error::Add the SUPABASE_PROJECT_REF variable."; exit 1; }
-          supabase functions deploy delete-account --project-ref "$PROJECT_REF"
+          npx --yes supabase@2 functions deploy delete-account --project-ref "$PROJECT_REF" --use-api
       - name: Check it answers
         run: |
           code=$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS "https://$PROJECT_REF.supabase.co/functions/v1/delete-account")
