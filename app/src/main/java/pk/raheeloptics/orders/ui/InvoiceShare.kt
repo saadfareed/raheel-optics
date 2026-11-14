@@ -59,10 +59,16 @@ object WhatsAppShare {
     /**
      * Opens WhatsApp addressed to [mobile] with the invoice picture and [message]. wa.me links cannot carry a picture,
      * so this uses a share intent aimed at the customer's chat; if WhatsApp is missing it falls back to the system sheet.
-     * The user always reviews and presses send; nothing is sent automatically.
+     * The user always reviews and presses send; nothing is sent automatically. Without [invoice] only the text is sent.
      */
-    fun send(context: Context, mobile: String, message: String, invoice: Invoice) {
+    fun send(context: Context, mobile: String, message: String, invoice: Invoice?) {
         val digits = (PakistanPhone.normalize(mobile) ?: error("This customer has no valid WhatsApp number.")).filter(Char::isDigit)
+        if (invoice == null) {
+            val text = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, message).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            try { context.startActivity(Intent(text).setPackage("com.whatsapp").putExtra("jid", "$digits@s.whatsapp.net")) }
+            catch (_: android.content.ActivityNotFoundException) { context.startActivity(Intent.createChooser(text, "Send message").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            return
+        }
         val folder = File(context.cacheDir, "invoices").apply { mkdirs(); listFiles()?.filter { it.lastModified() < System.currentTimeMillis() - 86_400_000 }?.forEach(File::delete) }
         val file = File(folder, "invoice-${System.currentTimeMillis()}.png")
         val bitmap = InvoiceRenderer.render(invoice)

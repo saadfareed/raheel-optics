@@ -1,6 +1,5 @@
 <resources>
-    <color name="launcher_background">#061F2D</color>
     <color name="splash_background_color">#F5F9FC</color>
     <bool name="light_system_bars">true</bool>
-    <item type="drawable" name="themed_splash_logo">@drawable/raheel_optics_logo</item>
+    <item type="drawable" name="themed_splash_logo">@drawable/ic_brand_mark_light</item>
 </resources>

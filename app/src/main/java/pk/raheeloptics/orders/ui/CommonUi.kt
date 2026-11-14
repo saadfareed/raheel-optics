@@ -26,10 +26,10 @@ import java.time.*
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
+/** The glasses-and-eye mark (2:1), in the variant for the app's own light or dark theme (not only the system's). */
 @Composable internal fun BrandLogo(modifier:Modifier) {
     val dark=MaterialTheme.colorScheme.background.luminance()<.5f
-    val image=@Composable {m:Modifier -> Image(painterResource(R.drawable.raheel_optics_logo),LocalBrand.current.config.name+" logo",m)}
-    if(dark) Box(modifier.background(Color.White,CircleShape).padding(4.dp),contentAlignment=Alignment.Center) {image(Modifier.fillMaxSize())} else image(modifier)
+    Image(painterResource(if(dark) R.drawable.ic_brand_mark_dark else R.drawable.ic_brand_mark_light),LocalBrand.current.config.name+" logo",modifier)
 }
 
 internal val codec=Json { ignoreUnknownKeys=true; encodeDefaults=true }

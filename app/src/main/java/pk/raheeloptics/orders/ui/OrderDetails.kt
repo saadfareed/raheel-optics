@@ -27,11 +27,11 @@ import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable internal fun OrderDetailScreen(order:Order,busy:Boolean,close:()->Unit,edit:()->Unit,
-    change:(Order)->Unit,complete:()->Unit,cancel:()->Unit,reorder:()->Unit) {
+    change:(Order)->Unit,complete:()->Unit,cancel:()->Unit) {
     var payment by remember {mutableStateOf("")}
     var refund by remember {mutableStateOf(false)}
     var error by remember {mutableStateOf<String?>(null)}
-    var sharing by remember {mutableStateOf(false)}
+    var sharing by remember {mutableStateOf<CustomerMessage?>(null)}
     val paid=order.payments.sumOf {it.amountPaisa}
     val balance=(order.amounts.totalPaisa-paid).coerceAtLeast(0)
     val zone=java.time.ZoneId.of("Asia/Karachi")
@@ -39,7 +39,7 @@ import kotlinx.coroutines.withContext
     fun at(millis:Long)=java.time.Instant.ofEpochMilli(millis).atZone(zone).format(dateTime)
     val statusTint=when(order.orderStatus) {OrderStatus.ACTIVE -> MaterialTheme.colorScheme.primary;OrderStatus.READY_FOR_PICKUP -> androidx.compose.ui.graphics.Color(0xFFB77A12);OrderStatus.COMPLETE -> MaterialTheme.colorScheme.secondary;OrderStatus.CANCEL -> MaterialTheme.colorScheme.onSurfaceVariant}
     val muted=MaterialTheme.colorScheme.onSurfaceVariant
-    fun eyeLine(eye:EyePrescription)=listOfNotNull("SPH ${eye.sphere.ifBlank {"—"}}",eye.cylinder?.takeIf {it.isNotBlank()}?.let {"CYL $it"},eye.axis?.let {"AXIS $it"},eye.prism?.takeIf {it.isNotBlank()}?.let {"PRISM $it"},eye.base?.let {"BASE ${it.name}"}).joinToString("  ·  ")
+    fun eyeLine(eye:EyePrescription)=eye.summary("  ·  ") ?: "—"
     FullScreenForm("Order ${order.orderNumber}",close,busy=busy) {padding ->
         LazyColumn(modifier=Modifier.padding(padding),contentPadding=PaddingValues(Ui.Gutter),verticalArrangement=Arrangement.spacedBy(Ui.Item)) {
             item {AppCard {
@@ -94,33 +94,92 @@ import kotlinx.coroutines.withContext
                     error?.let {Text(it,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)}
                 }
             }}
-            item {FlowRow(horizontalArrangement=Arrangement.spacedBy(Ui.Tight),verticalArrangement=Arrangement.spacedBy(Ui.Tight)) {
-                if(!order.orderStatus.isTerminal) OutlinedButton(onClick=edit,enabled=!busy,shape=Ui.Field) {Text("Edit order")}
-                if(order.orderStatus==OrderStatus.ACTIVE) Button(enabled=!busy,shape=Ui.Field,onClick={change(order.copy(orderStatus=OrderStatus.READY_FOR_PICKUP,updatedAt=System.currentTimeMillis()))}) {Text("Ready for pickup")}
-                if(order.orderStatus==OrderStatus.READY_FOR_PICKUP) {Button(onClick=complete,enabled=!busy,shape=Ui.Field) {Text("Complete")};OutlinedButton(onClick={sharing=true},shape=Ui.Field) {Icon(AppIcons.Chat,null,Modifier.size(18.dp),tint=Ui.WhatsApp);Spacer(Modifier.width(6.dp));Text("WhatsApp")}}
-                OutlinedButton(onClick=reorder,enabled=!busy,shape=Ui.Field) {Text("Repeat order")}
-                if(order.orderStatus==OrderStatus.ACTIVE) TextButton(onClick=cancel,enabled=!busy) {Text("Cancel order",color=MaterialTheme.colorScheme.error)}
+            // One full-width next step, then Edit and the WhatsApp message side by side, then Cancel.
+            val message=when(order.orderStatus) {
+                OrderStatus.ACTIVE -> CustomerMessage.PLACED to "WhatsApp"
+                OrderStatus.READY_FOR_PICKUP -> CustomerMessage.READY to "WhatsApp"
+                OrderStatus.COMPLETE -> CustomerMessage.COMPLETED to "Ask for review"
+                OrderStatus.CANCEL -> null
+            }
+            if(message!=null) item {Column(Modifier.fillMaxWidth(),verticalArrangement=Arrangement.spacedBy(Ui.Tight)) {
+                val tall=Modifier.heightIn(min=48.dp)
+                when(order.orderStatus) {
+                    OrderStatus.ACTIVE -> Button(enabled=!busy,shape=Ui.Field,modifier=tall.fillMaxWidth(),onClick={change(order.copy(orderStatus=OrderStatus.READY_FOR_PICKUP,updatedAt=System.currentTimeMillis()))}) {Text("Ready for pickup")}
+                    OrderStatus.READY_FOR_PICKUP -> Button(onClick=complete,enabled=!busy,shape=Ui.Field,modifier=tall.fillMaxWidth()) {Text("Complete")}
+                    else -> {}
+                }
+                Row(horizontalArrangement=Arrangement.spacedBy(Ui.Tight)) {
+                    if(!order.orderStatus.isTerminal) OutlinedButton(onClick=edit,enabled=!busy,shape=Ui.Field,modifier=tall.weight(1f)) {Icon(AppIcons.Edit,null,Modifier.size(18.dp));Spacer(Modifier.width(6.dp));Text("Edit order")}
+                    OutlinedButton(onClick={sharing=message.first},shape=Ui.Field,modifier=tall.weight(1f)) {Icon(AppIcons.Chat,null,Modifier.size(18.dp),tint=Ui.WhatsApp);Spacer(Modifier.width(6.dp));Text(message.second)}
+                }
+                if(order.orderStatus==OrderStatus.ACTIVE) TextButton(onClick=cancel,enabled=!busy,modifier=Modifier.fillMaxWidth()) {Text("Cancel order",color=MaterialTheme.colorScheme.error)}
             }}
         }
     }
-    if(sharing) PickupMessageDialog(order,{sharing=false})
+    sharing?.let {CustomerMessageDialog(order,it) {sharing=null}}
 }
 
-@Composable internal fun PickupMessageDialog(order:Order,close:()->Unit) {
+/** The WhatsApp message for each stage of an order. */
+internal enum class CustomerMessage(val title:String) {PLACED("Order confirmation"),READY("Pickup message"),COMPLETED("Feedback request")}
+
+/**
+ * Editable WhatsApp message for [order] at [kind]'s stage. The pickup message also picks a date and time slot.
+ * Placed and pickup messages carry the invoice picture; the feedback request is text only. Closing sends nothing.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable internal fun CustomerMessageDialog(order:Order,kind:CustomerMessage,close:()->Unit) {
     val context=LocalContext.current
     val shop=remember {ShopPreferences.load(context)}
-    var window by remember {mutableStateOf("")}
-    var balance by remember {mutableStateOf(true)}
-    var message by remember(window,balance) {mutableStateOf(shop.readyMessage(order,window,balance))}
+    val now=remember {java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Karachi"))}
+    // Start on the first day (within two weeks) that still has a pickup slot.
+    var date by remember {mutableStateOf(generateSequence(now.toLocalDate()) {it.plusDays(1)}.take(14).firstOrNull {shop.pickupSlots(it,now).isNotEmpty()} ?: now.toLocalDate())}
+    val slots=remember(date) {shop.pickupSlots(date,now)}
+    // A custom range (set by the shop, any day) replaces the shop's slots.
+    var custom by remember {mutableStateOf<OpeningInterval?>(null)}
+    var slot by remember(date) {mutableStateOf(if(custom==null) slots.firstOrNull() else null)}
+    var message by remember(date,slot,custom) {mutableStateOf(when(kind) {
+        CustomerMessage.PLACED -> shop.placedMessage(order)
+        CustomerMessage.READY -> shop.readyMessage(order,date,custom ?: slot)
+        CustomerMessage.COMPLETED -> shop.completedMessage(order)
+    })}
     var error by remember {mutableStateOf<String?>(null)}
-    FullScreenForm("Pickup message",close,"Open WhatsApp",save={try {
+    val due=order.amounts.totalPaisa-order.payments.sumOf {it.amountPaisa}
+    FullScreenForm(kind.title,close,"Open WhatsApp",save={try {
+        check(kind!=CustomerMessage.READY || slot!=null || custom!=null) {"Choose a time slot or set a custom range."}
         val mobile=order.customerMobile.ifBlank {order.normalizedMobile}
-        WhatsAppShare.send(context,mobile,message,InvoiceBuilder.build(shop,order.title,mobile,listOf(order)));close()
+        WhatsAppShare.send(context,mobile,message,if(kind==CustomerMessage.COMPLETED) null else InvoiceBuilder.build(shop,order.title,mobile,listOf(order)));close()
     } catch(e:Exception) {error=e.message ?: "WhatsApp could not be opened."}}) {padding ->
         LazyColumn(Modifier.padding(padding),contentPadding=PaddingValues(Ui.Gutter),verticalArrangement=Arrangement.spacedBy(Ui.Item)) {
-            item {AppTextField(window,{window=it.take(80)},"One-time pickup window · optional")}
-            item {Row {Checkbox(balance,{balance=it});Text("Include outstanding balance")}}
-            item {AppTextField(message,{message=it.take(1500)},"Review message",singleLine=false,minLines=6,supporting="${message.length}/1500")}
+            if(kind==CustomerMessage.READY) {
+                item {OutlinedButton(onClick={
+                    android.app.DatePickerDialog(context,{_,y,m,d ->date=java.time.LocalDate.of(y,m+1,d);error=null},date.year,date.monthValue-1,date.dayOfMonth).apply {
+                        datePicker.minDate=now.toLocalDate().atStartOfDay(java.time.ZoneId.of("Asia/Karachi")).toInstant().toEpochMilli()
+                    }.show()
+                },shape=Ui.Field,modifier=Modifier.fillMaxWidth()) {Icon(AppIcons.Event,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp))
+                    Text("Pickup date · "+date.format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM yyyy",java.util.Locale.US)))}}
+                item {Column(verticalArrangement=Arrangement.spacedBy(4.dp)) {
+                    Text("Time",style=MaterialTheme.typography.labelLarge)
+                    if(slots.isEmpty() && custom==null) Text("The shop is closed or has no slots left on this day. Choose another date or set a custom range.",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodyMedium)
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        slots.forEach {s ->FilterChip(custom==null && s==slot,{slot=s;custom=null;error=null},{Text(s.label())})}
+                        FilterChip(custom!=null,{
+                            // Pick the start, then the end (defaults to two hours later); the end must come after the start.
+                            val first=custom ?: OpeningInterval(((now.hour+1)%24)*60,((now.hour+3)%24)*60)
+                            android.app.TimePickerDialog(context,{_,h,m ->
+                                val start=h*60+m;val suggested=minOf(start+120,1439)
+                                android.app.TimePickerDialog(context,{_,eh,em ->
+                                    val end=eh*60+em
+                                    if(end<=start) error="The end time must be after the start time." else {custom=OpeningInterval(start,end);slot=null;error=null}
+                                },(if(custom!=null && first.end>start) first.end else suggested)/60,(if(custom!=null && first.end>start) first.end else suggested)%60,false).apply {setTitle("Pickup until")}.show()
+                            },first.start/60,first.start%60,false).apply {setTitle("Pickup from")}.show()
+                        },{Text(custom?.let {"Custom · "+it.label()} ?: "Custom range")},
+                            leadingIcon={Icon(AppIcons.Schedule,null,Modifier.size(18.dp))})
+                    }
+                }}
+                if(due>0 && shop.paymentAccounts.none {it.shared}) item {Text("Add JazzCash, Easypaisa or bank details in Settings → Shop details so customers can pay in advance.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+            }
+            if(kind==CustomerMessage.COMPLETED && shop.reviewUrl.isBlank()) item {Text("Add your Google review link in Settings → Shop details to ask for reviews.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+            item {AppTextField(message,{message=it.take(1500)},"Message",singleLine=false,minLines=6,supporting="${message.length}/1500")}
             error?.let {item {Text(it,color=MaterialTheme.colorScheme.error)}}
         }
     }

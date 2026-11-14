@@ -34,7 +34,7 @@ fun OnboardingScreen(busy:Boolean,error:String?,onFinish:()->Unit) {
     Surface(color=MaterialTheme.colorScheme.background,modifier=Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal=Ui.Gutter,vertical=Ui.Tight),verticalAlignment=Alignment.CenterVertically) {
-                BrandLogo(Modifier.size(44.dp))
+                BrandLogo(Modifier.size(60.dp,30.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(androidx.compose.ui.res.stringResource(pk.raheeloptics.orders.R.string.app_name),Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.SemiBold,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 TextButton(onClick=onFinish,enabled=!busy) {Text("Skip")}

@@ -1,6 +1,5 @@
 package pk.raheeloptics.orders.ui
 
-import android.content.Intent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -20,7 +19,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -112,13 +110,12 @@ internal fun OrdersScreen(state:UiState,model:OrdersViewModel,onEdit:(Order)->Un
     readyCandidate?.let {order ->AlertDialog(onDismissRequest={readyCandidate=null},title={Text("Ready for pickup?")},text={Text("Confirm that ${order.title}'s glasses are ready.")},
         confirmButton={TextButton(enabled=!state.busy,onClick={model.save(order.copy(orderStatus=OrderStatus.READY_FOR_PICKUP,updatedAt=System.currentTimeMillis()),order) {readyUndo=order};readyCandidate=null}) {Text("Mark ready")}},
         dismissButton={TextButton(onClick={readyCandidate=null}) {Text("Keep active")}})}
-    pickupMessage?.let {order ->PickupMessageDialog(order) {pickupMessage=null}}
+    pickupMessage?.let {order ->CustomerMessageDialog(order,CustomerMessage.READY) {pickupMessage=null}}
 }
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 internal fun OrderCard(todo:Order,now:Long,busy:Boolean,onEdit:(Order)->Unit,onComplete:(Order)->Unit,onDelete:(Order)->Unit,onReady:(Order)->Unit,modifier:Modifier=Modifier) {
-    val context=LocalContext.current
     val expanded=false
     val tint=when(todo.orderStatus) {OrderStatus.ACTIVE -> Violet;OrderStatus.READY_FOR_PICKUP -> Amber;OrderStatus.COMPLETE -> Mint;OrderStatus.CANCEL -> Muted}
     val canReady=todo.orderStatus.canMarkReady
@@ -160,17 +157,7 @@ internal fun OrderCard(todo:Order,now:Long,busy:Boolean,onEdit:(Order)->Unit,onC
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                     if(todo.orderStatus==OrderStatus.READY_FOR_PICKUP) {
                         Button(onClick={onComplete(todo)},enabled=!busy) {Text(OrderStatus.COMPLETE.label)}
-                        TextButton(onClick={
-                            val due=(todo.amounts.totalPaisa-todo.payments.sumOf {it.amountPaisa}).coerceAtLeast(0)/100
-                            val shop=context.getSharedPreferences("optical-shop",android.content.Context.MODE_PRIVATE)
-                            val shopName=shop.getString("name","Raheel Optics") ?: "Raheel Optics"
-                            val hours=shop.getString("weekdays","10:00 AM – 8:00 PM") ?: "10:00 AM – 8:00 PM"
-                            val phone=shop.getString("phone","").orEmpty()
-                            val contact=if(phone.isBlank()) "please contact the shop" else "contact us at $phone"
-                            val message="Hello ${todo.title}, your glasses for order ${todo.orderNumber} are ready for pickup from $shopName. Pickup hours: $hours. Amount due: PKR ${"%,d".format(due)}. If the shop is closed or you need assistance, $contact. Thank you."
-                            val intent=Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,message).setPackage("com.whatsapp")
-                            runCatching {context.startActivity(intent)}.getOrElse {context.startActivity(Intent.createChooser(intent.setPackage(null),"Share ready message"))}
-                        }) {Text("WhatsApp")}
+                        TextButton(onClick={onReady(todo)},enabled=!busy) {Text("WhatsApp")}
                     }
                     else if(canReady) Text("Swipe right when ready",Modifier.weight(1f),style=MaterialTheme.typography.labelSmall,color=Muted)
                     if(todo.orderStatus==OrderStatus.ACTIVE) TextButton(onClick={onDelete(todo)},enabled=!busy) {Text(OrderStatus.CANCEL.label,color=MaterialTheme.colorScheme.error)}

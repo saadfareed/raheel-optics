@@ -34,6 +34,12 @@ data class EyePrescription(
     val base: PrismBase? = null,
 )
 
+/** "SPH -2.25 · CYL -0.75 · AXIS 90", leaving out anything not entered; null when the eye has no values. */
+fun EyePrescription.summary(separator: String = " · "): String? =
+    listOfNotNull(sphere.takeIf { it.isNotBlank() }?.let { "SPH $it" }, cylinder?.takeIf { it.isNotBlank() }?.let { "CYL $it" },
+        axis?.let { "AXIS $it" }, prism?.takeIf { it.isNotBlank() }?.let { "PRISM $it" }, base?.let { "BASE ${it.name}" })
+        .takeIf { it.isNotEmpty() }?.joinToString(separator)
+
 @Serializable
 data class Prescription(
     val distanceRight: EyePrescription = EyePrescription(),

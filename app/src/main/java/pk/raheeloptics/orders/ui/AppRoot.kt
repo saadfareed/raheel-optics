@@ -67,6 +67,9 @@ fun AppRoot(target:String?,consumeTarget:()->Unit,model:OrdersViewModel=viewMode
     var adding by rememberSaveable { mutableStateOf(false) }
     var repeatDraft by rememberSaveable(stateSaver=todoSaver) {mutableStateOf<Order?>(null)}
     var deleting by remember { mutableStateOf<Order?>(null) }
+    // Offered right after an order is placed or completed; closing it sends nothing.
+    var stageMessage by remember { mutableStateOf<Pair<Order,CustomerMessage>?>(null) }
+    val complete:(Order)->Unit={order ->model.transition(order,"complete") {stageMessage=order to CustomerMessage.COMPLETED}}
     var details by rememberSaveable(stateSaver=todoSaver) {mutableStateOf<Order?>(null)}
     var logout by remember { mutableStateOf(false) }
     var allowed by remember { mutableStateOf(app.reminders.allowed()) }
@@ -105,7 +108,7 @@ fun AppRoot(target:String?,consumeTarget:()->Unit,model:OrdersViewModel=viewMode
         else Scaffold(containerColor=Paper,
             topBar={TopAppBar(title={
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                    if(tab=="Orders") BrandLogo(Modifier.size(40.dp))
+                    if(tab=="Orders") BrandLogo(Modifier.size(56.dp,28.dp))
                     Text(if(tab=="Orders") LocalBrand.current.config.name else tab,fontWeight=FontWeight.Bold)
                 }
             },actions={Tip("Notifications") {IconButton(onClick={tab="Inbox"}) {
@@ -118,7 +121,7 @@ fun AppRoot(target:String?,consumeTarget:()->Unit,model:OrdersViewModel=viewMode
                 if(state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
                 if(state.loading) LogoLoader(Modifier.fillMaxSize())
                 else when(tab) {
-                    "Orders" -> OrdersScreen(state,model,{model.dismissMessage();details=it},{model.transition(it,"complete")},{deleting=it})
+                    "Orders" -> OrdersScreen(state,model,{model.dismissMessage();details=it},complete,{deleting=it})
                     "Customers" -> CustomersScreen(state,model,{source ->repeatDraft=RepeatOrder.draft(source);editor=null;adding=true;model.dismissMessage()},{model.dismissMessage();details=it})
                     "Analytics" -> OpticalAnalyticsScreen(state,model)
                     "Inbox" -> InboxScreen(state.snapshot,allowed,notificationSettings,model) { id -> model.openTask(id) {todo -> editor=todo; if(todo!=null) tab="Orders"} }
@@ -127,12 +130,13 @@ fun AppRoot(target:String?,consumeTarget:()->Unit,model:OrdersViewModel=viewMode
             }
         }
         if(state.session!=null && (adding || editor!=null)) OrderEditor(editor,state.busy,state.message,{adding=false;editor=null;repeatDraft=null;model.dismissMessage()},repeatDraft,lookupCustomer={model.customerForMobile(it)}) {todo ->
-            model.save(todo,editor) {adding=false;editor=null;repeatDraft=null}
+            val placed=editor==null
+            model.save(todo,editor) {adding=false;editor=null;repeatDraft=null;if(placed) stageMessage=todo to CustomerMessage.PLACED}
         }
         if(state.session!=null) details?.let {order ->OrderDetailScreen(order,state.busy,{details=null},
             edit={details=null;editor=order},change={updated ->model.save(updated,order) {model.openOrder(order.id) {details=it}}},
-            complete={model.transition(order,"complete");details=null},cancel={details=null;deleting=order},
-            reorder={details=null;repeatDraft=RepeatOrder.draft(order);editor=null;adding=true})}
+            complete={complete(order);details=null},cancel={details=null;deleting=order})}
+        stageMessage?.let {(order,kind)->CustomerMessageDialog(order,kind) {stageMessage=null}}
         deleting?.let { todo -> AlertDialog(onDismissRequest={deleting=null},title={Text("Cancel order?")},
             text={Text("The order will stay in your records with status Cancel.")},confirmButton={TextButton(onClick={model.transition(todo,"delete");deleting=null},enabled=!state.busy) {Text("Cancel order",color=MaterialTheme.colorScheme.error)}},
             dismissButton={TextButton(onClick={deleting=null}) {Text("Keep order")}}) }

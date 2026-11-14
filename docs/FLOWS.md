@@ -86,10 +86,25 @@ Paths are under `app/src/main/java/pk/raheeloptics/orders/`. `VM` = `ui/OrdersVi
 
 ## 7. WhatsApp messages
 
-- **Pickup message** (ready orders), opened by swipe or button:
-  1. `OrderDetails.PickupMessageDialog` → `ShopPreferences.load` → `shop.readyMessage(order,window,balance)` builds editable text.
-  2. "Open WhatsApp" → `WhatsAppShare.send(context,mobile,message,InvoiceBuilder.build(...))`.
-  3. That renders an invoice picture and opens WhatsApp addressed to the customer. If WhatsApp isn't installed, the system share sheet opens instead.
+One screen, `OrderDetails.CustomerMessageDialog(order,kind)`, builds an editable message for each stage; "Open WhatsApp"
+opens the customer's chat and the user presses send. Closing it sends nothing.
+
+- **Order confirmation** (`PLACED`): opens by itself after a new order is saved (`AppRoot` → `model.save` callback), or
+  from the order's WhatsApp button while Active. `shop.placedMessage(order)`: greeting, order number, frame and lens,
+  total/paid/due, expected-ready date. Sent with the invoice picture.
+- **Feedback request** (`COMPLETED`): opens by itself after Complete (`AppRoot.complete` → `model.transition(...,onDone)`),
+  or from "Ask for review" on a completed order. `shop.completedMessage(order)`: thanks, asks for feedback and adds
+  `ShopSchedule.reviewUrl` (Settings → Shop details → Google review; blank leaves it out). Text only, no picture.
+- **Pickup message** (`READY`), opened by swipe, the card's WhatsApp button or the order's WhatsApp button:
+  1. `ShopPreferences.load`. The date defaults to the first day with a free slot;
+     `shop.pickupSlots(date,now)` cuts that day's opening hours into 2-hour slots (today: only slots not yet over). A "Custom range" chip
+     picks any from–until range instead (any day, even when closed).
+  2. `shop.readyMessage(order,date,slot)` builds editable text: pickup day and slot, amount due (always), and, when
+     something is owed, the payment accounts marked "Show in pickup messages" plus a request for the payment screenshot.
+     Accounts (JazzCash, Easypaisa, or bank: UBL, Meezan or another) are set in Settings → Shop details and stored in
+     `ShopSchedule.paymentAccounts` (this phone only).
+  3. "Open WhatsApp" → `WhatsAppShare.send(context,mobile,message,InvoiceBuilder.build(...))`.
+  4. That renders an invoice picture and opens WhatsApp addressed to the customer. If WhatsApp isn't installed, the system share sheet opens instead.
 - **Dues statement:** `CustomersScreen` → WhatsApp icon → `shop.duesMessage(customer,orders)` → `WhatsAppShare.send` with the open orders.
 
 ## 8. Sync with Supabase

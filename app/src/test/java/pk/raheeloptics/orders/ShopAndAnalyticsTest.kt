@@ -15,7 +15,8 @@ class ShopAndAnalyticsTest {
         val holiday=schedule.copy(exceptions=mapOf(sunday.toString() to ShopDay(open=false)))
         holiday.validate()
         assertFalse(holiday.effective(sunday).open)
-        assertTrue(holiday.readyMessage(Order("o","Customer"),date=sunday).contains("If the shop is closed"))
+        assertTrue(holiday.pickupSlots(sunday).isEmpty())
+        assertTrue(holiday.readyMessage(Order("o","Customer"),sunday,null).contains("Closed on Sunday"))
     }
     @Test fun overnightHoursCannotOverlapTheNextDay() {
         val days=List(7) {ShopDay(open=false)}.toMutableList()
