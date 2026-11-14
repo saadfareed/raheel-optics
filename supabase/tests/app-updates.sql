@@ -1,4 +1,9 @@
 begin;
+-- Migration 024 publishes a real row; this test works on its own copy inside the transaction.
+do $$ begin
+    if (select message from public.app_update_policy where platform='android') ilike '%daymark%' then raise exception 'Daymark text left in update policy'; end if;
+end $$;
+delete from public.app_update_policy;
 insert into public.app_update_policy(platform, latest_version_code, minimum_version_code, version_name, update_url)
 values ('android', 10, 5, '2.0', 'https://example.com/raheel-optics.apk');
 set local role anon;

@@ -23,6 +23,7 @@ import pk.raheeloptics.orders.R
 import pk.raheeloptics.orders.core.TaskAlert
 import pk.raheeloptics.orders.core.AlertKind
 import pk.raheeloptics.orders.core.Order
+import pk.raheeloptics.orders.core.OrderAlerts
 import pk.raheeloptics.orders.core.ReminderPolicy
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
@@ -81,11 +82,11 @@ class ReminderScheduler(private val context: Context) {
         if(todos.size<=5) {todos.forEach {notify(it)};return}
         if(!allowed()) return
         val manager=context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(NotificationChannel("todos","Task alerts",NotificationManager.IMPORTANCE_DEFAULT))
+        manager.createNotificationChannel(NotificationChannel("todos",ChannelName,NotificationManager.IMPORTANCE_DEFAULT))
         val tap=PendingIntent.getActivity(context,0,Intent(context,MainActivity::class.java),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         try {
             manager.notify("missed-reminders",0,NotificationCompat.Builder(context,"todos").setSmallIcon(R.drawable.ic_notification)
-                .setContentTitle("${todos.size} task alerts").setContentText("Review them in Inbox.")
+                .setContentTitle("${todos.size} orders need attention").setContentText("Open Inbox to see which customers are waiting.")
                 .setContentIntent(tap).setAutoCancel(true).setOnlyAlertOnce(true).setVisibility(NotificationCompat.VISIBILITY_PRIVATE).build())
         } catch(_:SecurityException) { /* Inbox entries remain available when notifications are suppressed. */ }
     }
@@ -96,15 +97,24 @@ class ReminderScheduler(private val context: Context) {
     fun notify(todo: Order,deadline:Boolean=false) {
         if (!allowed()) return
         val manager = context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(NotificationChannel("todos","Task alerts",NotificationManager.IMPORTANCE_DEFAULT))
+        manager.createNotificationChannel(NotificationChannel("todos",ChannelName,NotificationManager.IMPORTANCE_DEFAULT))
         val tap=PendingIntent.getActivity(context,0,Intent(context,MainActivity::class.java).setData("raheel-optics://order/${todo.id}".toUri()).putExtra("todo",todo.id),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val copy=OrderAlerts.text(todo,if(deadline) AlertKind.Deadline else AlertKind.Reminder)
+        val builder=NotificationCompat.Builder(context,"todos").setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(copy.title).setContentText(copy.text).setStyle(NotificationCompat.BigTextStyle().bigText(copy.details))
+            .setCategory(NotificationCompat.CATEGORY_REMINDER).setContentIntent(tap).setAutoCancel(true)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(NotificationCompat.Builder(context,"todos").setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(context.getString(R.string.app_name)).setContentText("An order needs your attention.").setAutoCancel(true).build())
+        copy.phone?.let { phone ->
+            val dial=PendingIntent.getActivity(context,todo.id.hashCode(),Intent(Intent.ACTION_DIAL,"tel:${phone.filter {it.isDigit() || it=='+'}}".toUri()),PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            builder.addAction(0,"Call customer",dial)
+        }
         try {
-            manager.notify(if(deadline) "deadline:${todo.id}" else todo.id,0,NotificationCompat.Builder(context,"todos").setSmallIcon(R.drawable.ic_notification).setContentTitle(todo.title).setContentText(if(deadline) "Your task deadline is due." else "Your todo reminder is due.").setContentIntent(tap).setAutoCancel(true)
-                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                .setPublicVersion(NotificationCompat.Builder(context,"todos").setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle(context.getString(R.string.app_name)).setContentText("You have a task reminder.").setAutoCancel(true).build()).build())
+            manager.notify(if(deadline) "deadline:${todo.id}" else todo.id,0,builder.build())
         } catch (_: SecurityException) { /* Permission can change after allowed(); the inbox remains available. */ }
     }
+    private companion object { const val ChannelName="Order reminders" }
 }
 
 class ReminderReceiver : BroadcastReceiver() {

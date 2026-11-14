@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.*
@@ -83,10 +84,20 @@ internal fun FullScreenForm(title:String,close:()->Unit,saveLabel:String="Save",
                 supporting=if(shop.phone.isNotBlank() && PakistanPhone.normalize(shop.phone)==null) "Enter a valid Pakistani mobile number." else null,
                 error=shop.phone.isNotBlank() && PakistanPhone.normalize(shop.phone)==null)}
             item {AppTextField(shop.address,{shop=shop.copy(address=it.take(500))},"Shop address",singleLine=false,minLines=2)}
-            item {TextButton(enabled=!locating,onClick={permission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION))}) {Text(if(locating) "Finding location…" else "Use current location")}}
+            item {TextButton(enabled=!locating,onClick={permission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION))}) {Text(if(locating) "Finding location…" else "Use current location")}}
             if(shop.latitude!=null && shop.longitude!=null) item {Column {
                 TextButton(onClick={runCatching {context.startActivity(Intent(Intent.ACTION_VIEW,android.net.Uri.parse("geo:${shop.latitude},${shop.longitude}?q=${shop.latitude},${shop.longitude}")))}.onFailure {error="No maps app is available."}}) {Text("View location pin")}
             }}
+            item {SectionLabel("Google review")}
+            item {AppTextField(shop.reviewUrl,{shop=shop.copy(reviewUrl=it.trim().take(500));error=null},"Review link",placeholder="https://g.page/r/…/review",
+                keyboard=KeyboardOptions(keyboardType=KeyboardType.Uri),error=shop.reviewUrl.isNotBlank() && !shop.reviewUrl.startsWith("https://"),
+                supporting="Sent with the thank-you message when an order is completed. Best: Google Business Profile → Ask for reviews → copy link. Leave empty to skip.")}
+            item {SectionLabel("Payment accounts")}
+            item {Text("Shared in pickup messages when money is due, so customers can pay in advance and send a screenshot.",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+            itemsIndexed(shop.paymentAccounts) {index,account ->PaymentAccountEditor(account,{changed ->shop=shop.copy(paymentAccounts=shop.paymentAccounts.mapIndexed {i,old ->if(i==index) changed else old});error=null}) {
+                shop=shop.copy(paymentAccounts=shop.paymentAccounts.filterIndexed {i,_ ->i!=index})
+            }}
+            if(shop.paymentAccounts.size<6) item {TextButton(onClick={shop=shop.copy(paymentAccounts=shop.paymentAccounts+PaymentAccount())}) {Text("+ Add payment account")}}
             item {SectionLabel("Weekly opening hours")}
             item {TextButton(onClick={shop=shop.copy(days=List(7) {shop.days.first()})}) {Text("Copy Monday's hours to all days")}}
             items((0..6).toList()) {index ->DayHoursEditor(DayOfWeek.of(index+1).getDisplayName(java.time.format.TextStyle.FULL,java.util.Locale.US),shop.days[index]) {day ->shop=shop.copy(days=shop.days.mapIndexed {i,old ->if(i==index) day else old})}}
@@ -100,6 +111,36 @@ internal fun FullScreenForm(title:String,close:()->Unit,saveLabel:String="Save",
             error?.let {item {Text(it,color=MaterialTheme.colorScheme.error)}}
         }
     }
+}
+
+private val KnownBanks=listOf("UBL","Meezan Bank")
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable private fun PaymentAccountEditor(account:PaymentAccount,change:(PaymentAccount)->Unit,remove:()->Unit) {
+    val bank=account.method==PaymentAccountType.BANK
+    val problem=remember(account) {runCatching {account.validate()}.exceptionOrNull()?.message}
+    OutlinedCard(Modifier.fillMaxWidth()) {Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {PaymentAccountType.entries.forEach {method ->
+            FilterChip(account.method==method,{change(account.copy(method=method,bank=if(method==PaymentAccountType.BANK) account.bank.ifBlank {KnownBanks.first()} else ""))},{Text(method.label)})
+        }}
+        if(bank) {
+            var other by remember {mutableStateOf(account.bank !in KnownBanks)}
+            FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                KnownBanks.forEach {name ->FilterChip(!other && account.bank==name,{other=false;change(account.copy(bank=name))},{Text(name)})}
+                FilterChip(other,{other=true;change(account.copy(bank=""))},{Text("Other bank")})
+            }
+            if(other) AppTextField(account.bank,{change(account.copy(bank=it.take(60)))},"Bank name",placeholder="e.g. HBL")
+        }
+        AppTextField(account.number,{change(account.copy(number=it.take(34)))},if(bank) "Account number or IBAN" else "${account.method.label} mobile number",
+            placeholder=if(bank) "PK36MEZN0001234567890123" else "0300 1234567",keyboard=KeyboardOptions(keyboardType=if(bank) KeyboardType.Ascii else KeyboardType.Phone))
+        AppTextField(account.title,{change(account.copy(title=it.take(80)))},if(bank) "Account title" else "Account title · optional")
+        if(problem!=null && account.number.isNotBlank()) Text(problem,color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+        Row(verticalAlignment=Alignment.CenterVertically) {
+            Text("Show in pickup messages",Modifier.weight(1f))
+            Switch(account.shared,{change(account.copy(shared=it))})
+        }
+        TextButton(onClick=remove) {Text("Remove account",color=MaterialTheme.colorScheme.error)}
+    }}
 }
 
 @Composable private fun DayHoursEditor(label:String,day:ShopDay,change:(ShopDay)->Unit) {
@@ -121,8 +162,8 @@ internal fun FullScreenForm(title:String,close:()->Unit,saveLabel:String="Save",
 @Suppress("MissingPermission")
 private suspend fun currentShopLocation(context:Context):Location = suspendCancellableCoroutine {cont ->
     val manager=context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    val fine=context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==android.content.pm.PackageManager.PERMISSION_GRANTED
-    val provider=if(fine && manager.isProviderEnabled(LocationManager.GPS_PROVIDER)) LocationManager.GPS_PROVIDER else LocationManager.NETWORK_PROVIDER
+    // Approximate location only: the network provider is enough to suggest the shop's street address.
+    val provider=LocationManager.NETWORK_PROVIDER
     check(manager.isProviderEnabled(provider)) {"Location services disabled"}
     if(Build.VERSION.SDK_INT>=30) {
         val signal=CancellationSignal();cont.invokeOnCancellation {signal.cancel()}

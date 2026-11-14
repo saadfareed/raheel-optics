@@ -199,7 +199,7 @@ class OrdersViewModel(application: Application) : AndroidViewModel(application) 
         app.sessions.markOpened()
         mutable.update { UiState(session,app.sessions.config(),busy=it.busy,loading=session!=null,sessionIdleDays=app.sessions.idleDays(),message=if(expired) "Sign in again. Your local changes are safe." else null) }
         val started=android.os.SystemClock.elapsedRealtime()
-        fun phase(name:String) = android.util.Log.i("RaheelStartup","$name +${android.os.SystemClock.elapsedRealtime()-started}ms")
+        fun phase(name:String) { if(pk.raheeloptics.orders.BuildConfig.DEBUG || pk.raheeloptics.orders.BuildConfig.BUILD_TYPE=="perf") android.util.Log.i("RaheelStartup","$name +${android.os.SystemClock.elapsedRealtime()-started}ms") }
         store=app.workspace(); phase("workspace opened")
         val workspace=store ?: run { mutable.update { it.copy(loading=false) }; return }
         withContext(Dispatchers.Default) {workspace.reconcile()}; phase("reconciled")
@@ -368,11 +368,11 @@ class OrdersViewModel(application: Application) : AndroidViewModel(application) 
         if(!workspace.localOnly) enqueueSync(app)
         refresh(); onSaved()
     }
-    fun transition(todo:Order,action:String)=action {
+    fun transition(todo:Order,action:String,onDone:()->Unit={})=action {
         val workspace=store ?: error("Sign in first.")
         workspace.transition(todo,action)
         if(!workspace.localOnly) enqueueSync(app)
-        refresh()
+        refresh(); onDone()
     }
     fun openCustomers() {
         customersOpen=true

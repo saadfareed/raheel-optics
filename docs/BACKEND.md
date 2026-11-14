@@ -4,13 +4,14 @@ There is no server of our own. Everything runs on one Supabase project (currentl
 
 | Part | Where | Status | Purpose |
 |---|---|---|---|
-| Database tables + RPC functions | `supabase/migrations/001–023` | Applied | Stores orders, customers, payments and history per account; validates every change and assigns revisions so phones don't overwrite each other. |
+| Database tables + RPC functions | `supabase/migrations/001–024` | Applied | Stores orders, customers, payments and history per account; validates every change and assigns revisions so phones don't overwrite each other. |
 | Row-level security | in the migrations | Applied | Each account can read and write only its own rows. |
 | Auth | Supabase dashboard / Management API | Configured | Email sign-up with 6-digit codes; Gmail SMTP (`smtp.gmail.com`, sender "Raheel Optics"); 30 emails/hour. |
 | Email templates | `supabase/auth-email-templates.json` | Applied | Branded HTML for sign-up, password reset and sign-in codes (`{{ .Token }}`). |
 | Storage bucket `optical-frames` | migration 016 | Created | Private frame photos (not used by the app yet; photos are device-only). |
-| Edge function `delete-account` | `supabase/functions/delete-account` | **Not deployed** | Called by Settings → Delete account. Required by Google Play. |
-| Release site | `release-site/` | **Not hosted** | Privacy policy and account-deletion pages required by Google Play. |
+| Edge function `delete-account` | `supabase/functions/delete-account` | Deployed by `.github/workflows/delete-account-function.yml` | Called by Settings → Delete account and the deletion page. Required by Google Play. |
+| Release site | `release-site/` | GitHub Pages via `.github/workflows/release-site.yml` | Privacy policy and account-deletion pages required by Google Play. |
+| Update policy | `app_update_policy` (migrations 006, 024) | Applied (v1.5.1, min 1) | Remote soft/forced update. Raise `minimum_version_code` to force everyone off a broken build (example in 024). |
 
 ## Functions the app calls
 
@@ -29,10 +30,10 @@ Full request/response shapes: [OPTICAL-API.md](OPTICAL-API.md).
 
 001–015 build the original sync engine (operation receipts, revisions, quotas, history). 016–022 add the optical shop
 (customers, orders, payments, events, frame images, shop hours, order feed) and copy any older orders across. 023
-retires the to-do API. Apply them in order; each runs once and is recorded in `public.raheel_migrations`.
+retires the to-do API. 024 publishes the Android update-policy row. Apply them in order; each runs once and is recorded in `public.raheel_migrations`.
 
 ```bash
-scripts/apply-migrations.sh 001 002 003 004 005 006 007 008 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023
+scripts/apply-migrations.sh 001 002 003 004 005 006 007 008 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024
 ```
 
 `DATABASE_URL` must work over IPv4; use the session pooler
@@ -49,9 +50,12 @@ up the `public` schema to `build/backups/` first.
 
 ## Before release
 
-1. Deploy the delete-account function: `supabase functions deploy delete-account --project-ref <ref>`.
-2. Host `release-site/` (GitHub Pages / Netlify / Cloudflare Pages) and set `RELEASE_PRIVACY_URL` and
-   `RELEASE_ACCOUNT_DELETION_URL` in `.env`.
+1. Push to GitHub, then in the repo settings:
+   - Pages > Source: **GitHub Actions**.
+   - Secrets and variables > Actions: secret `SUPABASE_ACCESS_TOKEN`, variable `SUPABASE_PROJECT_REF`.
+   Both workflows also run from the Actions tab ("Run workflow").
+2. Check that `RELEASE_PRIVACY_URL` and `RELEASE_ACCOUNT_DELETION_URL` in `.env` match the Pages address
+   (`https://<user>.github.io/<repo>/privacy.html` and `.../delete-account.html`); they are built into the app.
 3. Rotate the database password and `SUPABASE_ACCESS_TOKEN` if this project becomes production, or create a fresh
    project and apply the migrations there.
 4. Back up `.engineering/signing/optics-release.keystore` and its password from `.env`.
