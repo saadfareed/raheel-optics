@@ -58,4 +58,4 @@ up the `public` schema to `build/backups/` first.
    (`https://<user>.github.io/<repo>/privacy.html` and `.../delete-account.html`); they are built into the app.
 3. Rotate the database password and `SUPABASE_ACCESS_TOKEN` if this project becomes production, or create a fresh
    project and apply the migrations there.
-4. Back up `.engineering/signing/optics-release.keystore` and its password from `.env`.
+4. Back up `.engineering/signing/raheel-optics-release.jks` and its password from `.env`.
