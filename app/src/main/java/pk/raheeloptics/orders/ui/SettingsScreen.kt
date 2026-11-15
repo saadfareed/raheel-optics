@@ -57,7 +57,6 @@ internal fun SettingsScreen(state:UiState,allowed:Boolean,requestPermission:()->
             }
             if(state.session?.localOnly==true) Icon(AppIcons.ChevronRight,null,tint=Muted)
         }}}
-        if(pk.raheeloptics.orders.BuildConfig.DEMO_DATA) item {SettingsRow(AppIcons.Storage,"Load demo data","33 customers, about 50 orders (test builds only)",{model.loadDemoData()},enabled=!state.busy)}
         item {SettingsRow(AppIcons.Schedule,"Shop details & timings",ShopPreferences.load(context).phone.let {if(it.isBlank()) "Add your WhatsApp number — used in customer messages" else "WhatsApp $it · hours and address"},{shopDialog=true})}
         item {Surface(shape=RoundedCornerShape(24.dp),color=MaterialTheme.colorScheme.surface) {Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {

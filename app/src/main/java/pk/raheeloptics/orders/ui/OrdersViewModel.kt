@@ -402,28 +402,6 @@ class OrdersViewModel(application: Application) : AndroidViewModel(application) 
         refresh();onSaved()
     }
 
-    /** Debug builds only: adds the labelled demo orders (see [DemoData]); re-running skips ones already present. */
-    fun loadDemoData()=action {
-        val workspace=store ?: error("Open your shop first.")
-        // An earlier demo load used other ids; cancel any of its orders that are still open so nothing shows twice.
-        for(n in 1..6) workspace.orderById(UUID.nameUUIDFromBytes("${workspace.accountId}:demo-order:$n".toByteArray()).toString())
-            ?.takeIf {!it.orderStatus.isTerminal}?.let {workspace.transition(it,"delete")}
-        var added=0
-        for(order in DemoData.all(workspace.accountId)) {
-            if(workspace.hasTaskId(order.id)) continue
-            // Completed and cancelled orders are created open and then moved through the real transition, as in the app.
-            val terminal=order.orderStatus==OrderStatus.COMPLETE || order.orderStatus==OrderStatus.CANCEL
-            workspace.save(if(terminal) order.copy(orderStatus=OrderStatus.ACTIVE,status="active",completedAt=null,deliveredAt=null) else order,"create",null)
-            if(terminal) workspace.orderById(order.id)?.let {created ->workspace.transition(created,if(order.orderStatus==OrderStatus.COMPLETE) "complete" else "delete")}
-            added++
-        }
-        val shop=ShopPreferences.load(app)
-        if(shop.phone.isBlank()) ShopPreferences.save(app,shop.copy(phone=DemoData.SHOP_MOBILE))
-        if(!workspace.localOnly) enqueueSync(app)
-        refresh()
-        mutable.update {it.copy(message=if(added==0) "Demo data is already loaded." else "Added $added demo orders for ${DemoData.EXTRA_CUSTOMERS+1} customers.")}
-    }
-
     fun saveCustomer(customer:Customer,onSaved:()->Unit)=action {
         val workspace=store ?: error("Open your shop first.")
         val profiles=OpticalStore(workspace.db,workspace.accountId,localOnly=workspace.localOnly)

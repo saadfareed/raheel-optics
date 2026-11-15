@@ -5,6 +5,8 @@ Works offline and syncs between phones through Supabase.
 
 ## Docs
 
+- [Product guide](docs/PRODUCT.md): what it does, behaviour, data, security, running costs, limits
+- [Releasing](docs/RELEASING.md): versions, Play upload, update banner and forced update
 - [Architecture](docs/ARCHITECTURE.md): layers, source map, local database, build variants
 - [Flows](docs/FLOWS.md): step-by-step call chains for every feature
 - [Backend](docs/BACKEND.md): Supabase setup, functions, migrations, release checklist
@@ -32,10 +34,11 @@ export JAVA_HOME=~/jdk
 
 ```
 app/                  Android app (Kotlin, Jetpack Compose)
-supabase/migrations/  Database schema and RPC functions (001–023)
+supabase/migrations/  Database schema and RPC functions (001–024)
 supabase/tests/       SQL tests run by scripts/backend-gate.sh
 supabase/functions/   Edge function delete-account
-release-site/         Privacy and account-deletion pages for Google Play
+release-site/         Privacy and account-deletion pages (GitHub Pages)
+.github/workflows/    Deploy site and function; nightly keep-alive and encrypted backup
 scripts/              Migration, backend and device test scripts
 branding/             Logo sources
 ```

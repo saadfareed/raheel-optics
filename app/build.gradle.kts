@@ -69,7 +69,6 @@ android {
             require(value in bounds) { "$name must be in $bounds" }
             buildConfigField("int", name, value.toString())
         }
-        buildConfigField("boolean", "DEMO_DATA", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     sourceSets.getByName("main").res.directories.add(rootProject.file("branding/android-res").absolutePath)
@@ -81,7 +80,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildTypes {
-        getByName("debug") { buildConfigField("boolean", "DEMO_DATA", "true") }
         // Side-by-side build for instrumented tests: its own application id and data, so a test run can never touch the
         // account, orders or settings of the installed app.
         create("qa") {
@@ -145,7 +143,6 @@ android.buildTypes.create("perf") {
     signingConfig = android.signingConfigs.getByName("debug")
     matchingFallbacks += "release"
     resValue("string", "app_name", "${branding.getProperty("APP_NAME", "App")} Perf")
-    buildConfigField("boolean", "DEMO_DATA", "true")
 }
 val validateReleaseConfiguration = tasks.register("validateReleaseConfiguration") {
     doLast {

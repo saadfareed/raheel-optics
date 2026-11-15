@@ -15,7 +15,7 @@ import org.junit.Test
 import org.junit.rules.ExternalResource
 import org.junit.rules.RuleChain
 
-/** "Load more" on the Customers screen (the QA app has its own data; demo data supplies 33 customers). */
+/** "Load more" on the Customers screen (the QA app has its own data; each test adds 33 customers of its own). */
 class CustomerPaginationTest {
     val compose=createAndroidComposeRule<MainActivity>()
     private val guest=object:ExternalResource() {
@@ -32,10 +32,9 @@ class CustomerPaginationTest {
         lateinit var model:OrdersViewModel
         compose.runOnUiThread {model=ViewModelProvider(compose.activity)[OrdersViewModel::class.java]}
         compose.waitUntil(40000) {!model.state.value.loading && !model.state.value.busy}
-        compose.runOnUiThread {model.loadDemoData()}
-        compose.waitUntil(60000) {model.state.value.message?.contains("demo",ignoreCase=true) == true && !model.state.value.busy}
+        addCustomers()
         val total=runBlocking {(compose.activity.application as RaheelApp).workspace()!!.customerDirectory(CustomerDirectoryQuery(loaded=100)).size}
-        assertTrue("demo data supplies more than one page of customers ($total)",total>ListRules.PageSize+5)
+        assertTrue("more than one page of customers ($total)",total>ListRules.PageSize+5)
 
         compose.runOnUiThread {model.updateCustomers(CustomerDirectoryQuery())}
         compose.waitUntil(10000) {model.state.value.customers.size==ListRules.PageSize}
@@ -50,7 +49,7 @@ class CustomerPaginationTest {
         assertEquals(total>2*ListRules.PageSize,model.state.value.customersMore)
 
         // A new search starts again from a single page.
-        compose.runOnUiThread {model.updateCustomers(CustomerDirectoryQuery(search="Demo"))}
+        compose.runOnUiThread {model.updateCustomers(CustomerDirectoryQuery(search="Paging"))}
         compose.waitUntil(10000) {model.state.value.customers.size==ListRules.PageSize}
         assertTrue(model.state.value.customersMore)
     }
@@ -59,8 +58,7 @@ class CustomerPaginationTest {
         lateinit var model:OrdersViewModel
         compose.runOnUiThread {model=ViewModelProvider(compose.activity)[OrdersViewModel::class.java]}
         compose.waitUntil(40000) {!model.state.value.loading && !model.state.value.busy}
-        compose.runOnUiThread {model.loadDemoData()}
-        compose.waitUntil(60000) {model.state.value.message?.contains("demo",ignoreCase=true) == true && !model.state.value.busy}
+        addCustomers()
         compose.onNodeWithContentDescription("Customers").performClick()
         compose.waitUntil(40000) {model.state.value.customers.size==ListRules.PageSize}
         // The footer is below 25 cards in a lazy list, so scroll to it before pressing it.
@@ -68,5 +66,19 @@ class CustomerPaginationTest {
         compose.onNodeWithText("Load more customers").performClick()
         compose.waitUntil(10000) {model.state.value.customers.size>ListRules.PageSize}
         assertTrue(model.state.value.customers.size>ListRules.PageSize)
+    }
+
+    /** 33 customers with deterministic ids and mobiles, so running twice never duplicates them. */
+    private fun addCustomers() {
+        runBlocking {
+            val store=(compose.activity.application as RaheelApp).workspace()!!
+            for(c in 1..33) {
+                val id=java.util.UUID.nameUUIDFromBytes("${store.accountId}:paging-order:$c".toByteArray()).toString()
+                if(store.hasTaskId(id)) continue
+                val mobile="0300"+(2_000_000+c)
+                store.save(Order(id,"Paging Customer $c",customerMobile=mobile,normalizedMobile=PakistanPhone.normalize(mobile)!!,
+                    orderNumber="RO-PAGE-%02d".format(c),amounts=OrderAmounts(framePaisa=300000)),"create",null)
+            }
+        }
     }
 }

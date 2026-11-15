@@ -26,7 +26,7 @@ Paths are under `app/src/main/java/pk/raheeloptics/orders/`. `VM` = `ui/OrdersVi
    5. `RaheelApp.refreshReminders()` re-arms the alarms (`ReminderScheduler.reconcileSchedules`).
    6. Observers: `db.onChange(tables)` → `VM.refresh()` (debounced 75 ms); inbox changes → `refreshInbox()`.
    7. Signed-in accounts also call `enqueueSync` if anything is waiting.
-4. Log tag `RaheelStartup` prints each phase. `ReportDrawnWhen` reports "fully drawn" once the first page is shown.
+4. Log tag `RaheelStartup` prints each phase (debug and perf builds only). `ReportDrawnWhen` reports "fully drawn" once the first page is shown.
 
 ## 2. Create account (email code)
 
@@ -141,7 +141,9 @@ opens the customer's chat and the user presses send. Closing it sends nothing.
 2. **Alarm fires:** `ReminderReceiver.onReceive`:
    - `Store.activeTodo(id)` checks the order is still active and the time still matches
    - `Store.addTaskAlert` adds an inbox row
-   - `ReminderScheduler.notify` posts the notification
+   - `ReminderScheduler.notify` posts the notification. Its text comes from `core/OrderAlertText.kt`
+     (`OrderAlerts.text`): customer, order number, promised time, ready state, balance, next step, and a
+     "Call customer" action (`ACTION_DIAL`). The lock screen shows only "An order needs your attention".
    - `reconcileSchedules` re-arms the next alarm
 3. **Reboot, time change or app update:** `BootReceiver` → `ReminderWorker`:
    - `Store.deliverDueTaskAlerts` delivers anything missed
@@ -172,6 +174,6 @@ the app's private storage, and its id is kept on the order. Photos are **device-
 
 ## 14. Startup timing
 
-`adb logcat -s RaheelStartup ActivityTaskManager` shows each phase and the "Fully drawn" time. The perf build reaches
+`adb logcat -s RaheelStartup ActivityTaskManager` (debug or perf build) shows each phase and the "Fully drawn" time. The perf build reaches
 a usable Orders list in about 1.4–2.2 s. The debug and QA builds are slower because Compose code isn't optimised in
 debuggable builds.

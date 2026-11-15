@@ -28,7 +28,7 @@ backed by Supabase. Every change is saved on the phone first and synced to the c
 | Domain | `core` | Plain Kotlin models and rules: `Order`, `Customer`, `OrderStatus`, validation (`FieldRules`, `Rules`), money, invoice text, wire format (`OrderWire`). No Android UI. |
 | Identity | `identity` | `AuthClient` (Supabase Auth calls), `SessionStore` (encrypted session + workspace registry), `TokenTransport` (HTTP with token refresh). |
 | Sync | `sync` | `enqueueSync`/`SyncWorker` (WorkManager job when online) and `SupabaseSynchronizer` (upload queue, download feed). |
-| Reminders | `reminders` | `ReminderScheduler` sets exact alarms for promised/reminder times and posts notifications. |
+| Reminders | `reminders`, `core/OrderAlertText.kt` | `ReminderScheduler` sets alarms for promised/reminder times and posts notifications; `OrderAlerts` writes their text. |
 | Other | `branding`, `updates`, `onboarding`, `CrashReporting` | Logo/name from the server, forced-update gate, first-run intro, Firebase Crashlytics (release builds only). |
 
 ## Source map (UI)
@@ -47,7 +47,7 @@ backed by Supabase. Every change is saved on the phone first and synced to the c
 | `AnalyticsDashboard.kt` | Sales/collection analytics for a period. |
 | `InboxScreen.kt` | Reminder and deadline notifications list. |
 | `SettingsScreen.kt` | Settings, storage, password, privacy, export/import, delete account. |
-| `ShopSettings.kt` | Shop name, WhatsApp number, hours, location. |
+| `ShopSettings.kt` | Shop name, WhatsApp number, hours, location (approximate), payment accounts, review link. |
 | `AccountScreens.kt` | Splash, sign-in / create account, email code, forgot password. |
 | `OnboardingScreen.kt` | First-run introduction. |
 
@@ -78,6 +78,6 @@ tables or JSON keys would need a data migration and gives no user benefit.
 | `debug` | `pk.raheeloptics.orders` | Development. |
 | `qa` | `pk.raheeloptics.orders.qa` | Side-by-side test build; instrumented tests run against it. |
 | `perf` | `pk.raheeloptics.orders.perf` | Release-like (R8, not debuggable) for startup measurements. |
-| `release` | `pk.raheeloptics.orders` | Signed with `RELEASE_STORE_*` from `.env`. |
+| `release` | `pk.raheeloptics.orders` | Signed with `RELEASE_STORE_*` from `.env`. See [RELEASING.md](RELEASING.md). |
 
-See [FLOWS.md](FLOWS.md) for step-by-step call chains and [BACKEND.md](BACKEND.md) for the server.
+See [PRODUCT.md](PRODUCT.md) for what the product does, [FLOWS.md](FLOWS.md) for step-by-step call chains and [BACKEND.md](BACKEND.md) for the server.

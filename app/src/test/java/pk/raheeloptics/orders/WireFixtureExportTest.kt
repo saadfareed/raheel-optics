@@ -15,7 +15,11 @@ class WireFixtureExportTest {
     private val json=Json {encodeDefaults=true}
     @Test fun exportOrderLifecycle() {
         val account="acct"
-        val base=DemoData.orders(account,1_760_000_000_000).first {it.orderStatus==OrderStatus.ACTIVE}.copy(payments=emptyList())
+        val base=Order(java.util.UUID.nameUUIDFromBytes("$account:order".toByteArray()).toString(),"Ali Khan",customerMobile="03001234567",
+            normalizedMobile="+923001234567",orderNumber="RO-0001",
+            prescription=Prescription(distanceRight=EyePrescription("-2.25","-0.75",90),distanceLeft=EyePrescription("-1.75","-0.50",85),pd="63"),
+            frame=FrameDetails(model="Metal"),lens=LensDetails(material="Blue cut"),amounts=OrderAmounts(framePaisa=450000,lensPaisa=300000),
+            orderedAt=1_760_000_000_000,updatedAt=1_760_000_000_000,dueAt=1_760_000_000_000+3*86_400_000L)
         val customer=Customer(java.util.UUID.nameUUIDFromBytes("$account:customer".toByteArray()).toString(),base.title,base.customerMobile,base.normalizedMobile,latestPrescription=base.prescription)
         var order=base.copy(customerId=customer.id)
         var t=1_760_000_000_000;var revision=0L

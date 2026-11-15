@@ -41,3 +41,6 @@ supabase/.branches/
 
 # Firebase config (from the Firebase console)
 **/google-services.json
+
+# Signing keys and local database backups (private)
+.engineering/
