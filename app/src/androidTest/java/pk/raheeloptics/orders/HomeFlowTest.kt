@@ -70,12 +70,13 @@ class HomeFlowTest {
         waitFor("Settings")
         compose.onNodeWithContentDescription("Settings").performClick()
         compose.onNodeWithText("Appearance").performScrollTo().performClick()
-        compose.onNodeWithText("Dark").performClick()
+        // The Appearance row also shows the current choice, so pick the menu option rather than the row.
+        compose.onNode(hasText("Dark") and !hasText("Appearance")).performClick()
         compose.activityRule.scenario.recreate()
         compose.onNodeWithText("Appearance").performScrollTo().assertIsDisplayed()
         org.junit.Assert.assertEquals("Dark",InstrumentationRegistry.getInstrumentation().targetContext.getSharedPreferences("appearance",0).getString("theme",null))
         compose.onNodeWithText("Appearance").performClick()
-        compose.onNodeWithText("Light").performClick()
+        compose.onNode(hasText("Light") and !hasText("Appearance")).performClick()
     }
 
     @Test fun guestSeesSignInOnTheAccountCardAndNoSeparateSignInRow() {

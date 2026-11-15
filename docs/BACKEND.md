@@ -11,6 +11,7 @@ There is no server of our own. Everything runs on one Supabase project (currentl
 | Storage bucket `optical-frames` | migration 016 | Created | Private frame photos (not used by the app yet; photos are device-only). |
 | Edge function `delete-account` | `supabase/functions/delete-account` | Deployed by `.github/workflows/delete-account-function.yml` | Called by Settings → Delete account and the deletion page. Required by Google Play. |
 | Release site | `release-site/` | GitHub Pages via `.github/workflows/release-site.yml` | Privacy policy and account-deletion pages required by Google Play. |
+| Keep-alive and backups | `.github/workflows/keep-alive-backup.yml` | Daily at 02:30 PKT | Stops the free project pausing; saves an encrypted backup (kept 30 days). |
 | Update policy | `app_update_policy` (migrations 006, 024) | Applied (v1.5.1, min 1) | Remote soft/forced update. Raise `minimum_version_code` to force everyone off a broken build (example in 024). |
 
 ## Functions the app calls
@@ -47,6 +48,26 @@ up the `public` schema to `build/backups/` first.
 | `scripts/backend-gate.sh` | Applies all migrations to a throwaway local PostgreSQL and runs `supabase/tests/*.sql`. |
 | `scripts/wire-contract-check.sh` | Replays the app's real request payloads against the migrations. |
 | `scripts/device-gate.sh` | Runs the instrumented tests on a connected phone against the QA build. |
+
+## Backups (free plan)
+
+The free plan pauses after 7 days without activity and has no downloadable backups. The daily workflow
+`Keep alive and back up` queries the database (which counts as activity) and saves
+`raheel-optics-YYYYMMDD.tar.gz.gpg` (shop data + sign-in accounts, AES-256) as a workflow artifact for 30 days.
+Needs repo secrets `DATABASE_URL` and `BACKUP_PASSPHRASE` (both in `.env`). Lose the passphrase and the
+backups cannot be opened.
+
+If the project does pause: Supabase dashboard > project > Restore (possible for 90 days). Phones keep working offline and
+sync when it is back.
+
+Restore into a fresh project (apply migrations 001–024 first):
+
+```bash
+gh run download <run-id> -n db-backup-<run-id>
+gpg -d raheel-optics-YYYYMMDD.tar.gz.gpg | tar -xz        # asks for BACKUP_PASSPHRASE
+pg_restore -d "$DATABASE_URL" --data-only --disable-triggers auth.dump
+pg_restore -d "$DATABASE_URL" --data-only --disable-triggers public.dump
+```
 
 ## Before release
 
