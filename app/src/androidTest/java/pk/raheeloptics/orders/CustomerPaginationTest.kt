@@ -59,6 +59,8 @@ class CustomerPaginationTest {
         compose.runOnUiThread {model=ViewModelProvider(compose.activity)[OrdersViewModel::class.java]}
         compose.waitUntil(40000) {!model.state.value.loading && !model.state.value.busy}
         addCustomers()
+        // The new customers trigger a refresh; wait for the tab bar to be back before using it.
+        compose.waitUntil(30000) {compose.onAllNodesWithContentDescription("Customers").fetchSemanticsNodes().isNotEmpty()}
         compose.onNodeWithContentDescription("Customers").performClick()
         compose.waitUntil(40000) {model.state.value.customers.size==ListRules.PageSize}
         // The footer is below 25 cards in a lazy list, so scroll to it before pressing it.
